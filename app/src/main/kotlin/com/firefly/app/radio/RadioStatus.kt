@@ -11,5 +11,7 @@ data class RadioStatus(
     val packetsReceived: Int = 0,
     val packetsDeduped: Int = 0,
     val packetsForeign: Int = 0,
+    val packetsRelayed: Int = 0,
+    val relaysDropped: Int = 0,
     val lastPacketAtMillis: Long? = null,
 )

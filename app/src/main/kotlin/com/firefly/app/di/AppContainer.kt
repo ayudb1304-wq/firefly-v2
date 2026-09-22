@@ -52,7 +52,7 @@ class AppContainer(private val appContext: Context) {
     val seqCounter: SeqCounter = SeqCounter()
 
     val pingRepository: PingRepository by lazy {
-        PingRepository(database.pingDao(), txQueue, seqCounter, { groupRepository.current.value }, { locationSource.fixes.value })
+        PingRepository(database.pingDao(), txQueue, seqCounter, { groupRepository.current.value }, { locationSource.fixes.value }, appScope)
     }
 
     /** Fresh incoming pings, for the in-app banner. No replay: late subscribers use the timeline. */

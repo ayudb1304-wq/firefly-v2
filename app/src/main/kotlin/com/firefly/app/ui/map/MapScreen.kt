@@ -94,8 +94,10 @@ fun MapScreen(session: GroupSession) {
     var sheetFor by remember { mutableStateOf<Recipient?>(null) }
     var showTimeline by remember { mutableStateOf(false) }
     var banner by remember { mutableStateOf<PingEntity?>(null) }
+    val sosActive by vm.sosActive.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.incoming.collect { banner = it } }
-    LaunchedEffect(banner) { if (banner != null) { delay(8_000); banner = null } }
+    // Ordinary pings auto-hide; an SOS stays until dismissed (PRD F1: persistent alert).
+    LaunchedEffect(banner) { if (banner != null && banner!!.code != com.firefly.app.core.protocol.Codebook.HELP) { delay(8_000); banner = null } }
 
     sheetFor?.let { r ->
         CodebookSheet(
@@ -162,17 +164,43 @@ fun MapScreen(session: GroupSession) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (sosActive) {
+                Card(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
+                ) {
+                    Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.sos_active), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                        TextButton(onClick = vm::cancelSos) { Text(stringResource(R.string.sos_cancel), color = MaterialTheme.colorScheme.onError) }
+                    }
+                }
+            }
             banner?.let { b ->
                 val from = names[b.senderId] ?: SenderId.hex(b.senderId)
                 val poiName = venue?.pois?.firstOrNull { it.index == b.arg }?.name
+                val isSos = b.code == com.firefly.app.core.protocol.Codebook.HELP
                 Card(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { banner = null; sheetFor = recipients.firstOrNull { it.senderId == b.senderId } ?: Recipient(b.senderId, from) },
-                    colors = CardDefaults.cardColors(containerColor = if (b.code == com.firefly.app.core.protocol.Codebook.HELP) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer),
+                    colors = CardDefaults.cardColors(containerColor = if (isSos) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer),
                 ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text(from, style = MaterialTheme.typography.labelMedium)
-                        Text(PingText.describe(context, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
-                        Text(stringResource(R.string.banner_tap_to_reply), style = MaterialTheme.typography.labelSmall)
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            if (isSos) {
+                                val myFix = me
+                                val dist = if (myFix != null && b.lat != null && b.lon != null) GeoMath.distanceMetres(myFix.lat, myFix.lon, b.lat, b.lon) else null
+                                val bearing = if (dist != null) GeoMath.bearingDegrees(myFix!!.lat, myFix.lon, b.lat!!, b.lon!!) else null
+                                Text(stringResource(R.string.sos_incoming, from), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                                Text(
+                                    if (dist != null) stringResource(R.string.sos_incoming_at, Format.distance(dist), Format.bearingArrow(bearing)) else stringResource(R.string.sos_incoming_nopos),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            } else {
+                                Text(from, style = MaterialTheme.typography.labelMedium)
+                                Text(PingText.describe(context, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
+                                Text(stringResource(R.string.banner_tap_to_reply), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                        if (isSos) TextButton(onClick = { banner = null }) { Text(stringResource(R.string.banner_dismiss)) }
                     }
                 }
             }
@@ -219,7 +247,8 @@ private fun StatusRow(radio: RadioStatus, meFixAgeMillis: Long?, accuracy: Float
         append(if (radio.degradedReason != null) "⚠ ${radio.degradedReason}" else if (radio.running) "● radio" else "○ radio off")
         append(if (radio.advertising) " adv" else "")
         append(if (radio.scanning) " scan" else "")
-        append(" · tx ${radio.packetsSent} rx ${radio.packetsReceived} dup ${radio.packetsDeduped}")
+        append(" · tx ${radio.packetsSent} rx ${radio.packetsReceived} dup ${radio.packetsDeduped} rly ${radio.packetsRelayed}")
+        if (radio.relaysDropped > 0) append(" (−${radio.relaysDropped})")
         append(" · gps ")
         append(if (meFixAgeMillis == null) "—" else "${accuracy?.toInt() ?: "?"} m, ${meFixAgeMillis / 1000}s")
     }

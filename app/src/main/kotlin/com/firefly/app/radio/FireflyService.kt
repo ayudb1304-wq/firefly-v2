@@ -28,7 +28,10 @@ import com.firefly.app.core.protocol.Packet
 import com.firefly.app.core.protocol.PacketCodec
 import com.firefly.app.core.protocol.Protocol
 import com.firefly.app.core.protocol.toHexSpaced
+import com.firefly.app.core.geo.LatLon
 import com.firefly.app.core.routing.DedupeCache
+import com.firefly.app.core.routing.RelayPolicy
+import com.firefly.app.core.routing.RelayQueue
 import com.firefly.app.data.repo.GroupSession
 import com.firefly.app.location.Fix
 import com.firefly.app.ui.codebook.PingText
@@ -52,8 +55,8 @@ import kotlin.random.Random
 /**
  * Foreground service that owns the radio (ARCHITECTURE.md §4, §6).
  * Advertises our own BEACON, bursts queued pings/ACKs/names, scans for the
- * group's packets, updates members and the timeline. Relaying arrives in Phase 3;
- * the dedupe step already runs before anything else.
+ * group's packets, updates members and the timeline, and relays what
+ * [RelayPolicy] says to relay (PROTOCOL.md §5). Dedupe runs before anything else.
  */
 class FireflyService : Service() {
 
@@ -68,6 +71,7 @@ class FireflyService : Service() {
     private lateinit var battery: BatteryLogger
     private lateinit var alerts: Alerts
     private val dedupe = DedupeCache()
+    private val relayQueue = RelayQueue()
     private val inbound = Channel<RawAdvert>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** Only one thing is on air at a time: own beacon updates wait for bursts to finish. */
@@ -119,6 +123,7 @@ class FireflyService : Service() {
         scope.launch { pipeline() }
         scope.launch { beaconLoop() }
         scope.launch { txLoop() }
+        scope.launch { relayLoop() }
         scope.launch { nameLoop() }
     }
 
@@ -179,6 +184,27 @@ class FireflyService : Service() {
                 }
                 if (i < req.repeats - 1) delay((req.spacingMillis - BURST_MS).coerceAtLeast(0))
             }
+        }
+    }
+
+    /** PROTOCOL.md §5 steps 7–8: jitter, one 500 ms burst per relayed packet, rate-limited by [RelayQueue]. */
+    private suspend fun relayLoop() {
+        while (scope.isActive) {
+            val now = System.currentTimeMillis()
+            val entry = relayQueue.poll(now)
+            if (entry == null) {
+                delay(relayQueue.waitMillis(now).coerceIn(RELAY_IDLE_POLL_MS, 1_000L))
+                continue
+            }
+            delay(relayQueue.jitterMillis())
+            val adv = advertiser ?: continue
+            airtime.withLock {
+                adv.update(PacketCodec.encode(entry.packet))
+                delay(RELAY_BURST_MS)
+                adv.update(currentBeacon())
+            }
+            status.update { it.copy(packetsRelayed = it.packetsRelayed + 1) }
+            Log.d(TAG, "RELAY type=${entry.packet.type} from=${SenderId.hex(entry.packet.senderId)} seq=${entry.packet.seq} hops=${entry.packet.hops} ttl=${entry.packet.ttl}")
         }
     }
 
@@ -244,12 +270,24 @@ class FireflyService : Service() {
                     Protocol.Type.PING -> if (forMe) onPing(packet, raw.rssi, now)
                     Protocol.Type.ACK -> if (packet.target == s.senderId) container.pingRepository.onAck(packet, now)
                 }
+                maybeRelay(packet, s.senderId, now)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // One bad packet must not stop the pipeline (CLAUDE.md: the service owns the radio).
                 Log.e(TAG, "error handling packet from ${SenderId.hex(packet.senderId)}", e)
             }
+        }
+    }
+
+    private suspend fun maybeRelay(packet: Packet, myId: Int, now: Long) {
+        val myPos = container.locationSource.fixes.value?.let { LatLon(it.lat, it.lon) }
+        val target = if (packet.isBroadcast || packet.priority) null else container.memberRepository.targetInfo(packet.target)
+        when (val d = RelayPolicy.decide(packet, myId, myPos, target, now)) {
+            is RelayPolicy.Decision.Relay -> {
+                if (!relayQueue.offer(packet.relayed(), now)) status.update { it.copy(relaysDropped = it.relaysDropped + 1) }
+            }
+            is RelayPolicy.Decision.Drop -> if (d.reason == RelayPolicy.Reason.NOT_CLOSER) Log.v(TAG, "no relay (not closer) seq=${packet.seq}")
         }
     }
 
@@ -303,6 +341,7 @@ class FireflyService : Service() {
         Log.i(TAG, "stopping")
         runCatching { unregisterReceiver(btReceiver) }
         stopRadio()
+        relayQueue.clear()
         battery.stop()
         container.locationSource.stop()
         scope.cancel()
@@ -322,6 +361,9 @@ class FireflyService : Service() {
         const val BURST_MS = 600L
         const val ACK_JITTER_MIN_MS = 150L
         const val ACK_JITTER_MAX_MS = 700L
+        /** PROTOCOL.md §5 step 7: one burst per relayed packet. */
+        const val RELAY_BURST_MS = 500L
+        const val RELAY_IDLE_POLL_MS = 100L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, FireflyService::class.java))

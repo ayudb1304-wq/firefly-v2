@@ -59,8 +59,12 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
     val incoming: SharedFlow<PingEntity> = container.incomingPings
 
     fun send(code: Int, arg: Int, target: Int) = viewModelScope.launch {
+        if (code == com.firefly.app.core.protocol.Codebook.HELP) { container.pingRepository.startSos(); return@launch }
         if (container.pingRepository.send(code, arg, target) == null) _message.value = "Could not send"
     }
+
+    val sosActive: StateFlow<Boolean> = container.pingRepository.sosActive
+    fun cancelSos() = container.pingRepository.stopSos()
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()

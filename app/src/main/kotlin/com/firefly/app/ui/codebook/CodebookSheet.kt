@@ -36,7 +36,13 @@ import com.firefly.app.R
 import com.firefly.app.core.protocol.Codebook
 import com.firefly.app.core.protocol.Protocol
 import com.firefly.app.venue.Poi
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.RoundedCornerShape
 
 /** A pickable recipient: the group or one member. */
 data class Recipient(val senderId: Int, val label: String) {
@@ -49,7 +55,7 @@ data class Recipient(val senderId: Int, val label: String) {
  * The 12-button grid (PRD §5 screen 4). Two taps from the map for any message
  * without an argument: FAB → button. Messages with an argument add one picker step.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CodebookSheet(
     recipients: List<Recipient>,
@@ -60,10 +66,12 @@ fun CodebookSheet(
 ) {
     var recipient by remember { mutableStateOf(initialRecipient) }
     var pendingCode by remember { mutableStateOf<Int?>(null) }
+    var sosHint by remember { mutableStateOf(false) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 24.dp)) {
             Text(stringResource(R.string.codebook_to), style = MaterialTheme.typography.labelLarge)
+            if (sosHint) Text(stringResource(R.string.codebook_sos_hint), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
                 items(recipients, key = { it.senderId }) { r ->
                     FilterChip(selected = r.senderId == recipient.senderId, onClick = { recipient = r }, label = { Text(r.label) })
@@ -78,15 +86,33 @@ fun CodebookSheet(
                     modifier = Modifier.heightIn(max = 420.dp),
                 ) {
                     items(Codebook.userSendable, key = { it.code }) { entry ->
-                        val sos = entry.priority
-                        Button(
-                            onClick = {
-                                if (entry.arg == Codebook.ArgKind.NONE) onSend(entry.code, 0, recipient.senderId) else pendingCode = entry.code
-                            },
-                            modifier = Modifier.fillMaxWidth().height(64.dp),
-                            colors = if (sos) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error) else ButtonDefaults.buttonColors(),
-                        ) {
-                            Text(stringResource(PingText.labelRes(entry.code)), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge)
+                        if (entry.priority) {
+                            // PRD F1: SOS needs a long-press so it cannot be sent by accident.
+                            Surface(
+                                color = MaterialTheme.colorScheme.error,
+                                contentColor = MaterialTheme.colorScheme.onError,
+                                shape = RoundedCornerShape(20.dp),
+                                modifier = Modifier.fillMaxWidth().height(64.dp).combinedClickable(
+                                    onClick = { sosHint = true },
+                                    onLongClick = { onSend(entry.code, 0, Protocol.TARGET_BROADCAST) },
+                                ),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(stringResource(PingText.labelRes(entry.code)), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge)
+                                        Text(stringResource(R.string.codebook_hold), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    if (entry.arg == Codebook.ArgKind.NONE) onSend(entry.code, 0, recipient.senderId) else pendingCode = entry.code
+                                },
+                                modifier = Modifier.fillMaxWidth().height(64.dp),
+                            ) {
+                                Text(stringResource(PingText.labelRes(entry.code)), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
                 }

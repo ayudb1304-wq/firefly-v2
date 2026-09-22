@@ -13,7 +13,15 @@ import com.firefly.app.location.Fix
 import com.firefly.app.radio.SeqCounter
 import com.firefly.app.radio.TxQueue
 import com.firefly.app.radio.TxRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Codebook messages in and out (PRD C1/C2). Builds packets, records them, and
@@ -25,8 +33,30 @@ class PingRepository(
     private val seq: SeqCounter,
     private val session: () -> GroupSession?,
     private val fix: () -> Fix?,
+    private val scope: CoroutineScope,
 ) {
     val timeline: Flow<List<PingEntity>> = dao.observeTimeline()
+
+    private val _sosActive = MutableStateFlow(false)
+    /** PRD F1 / PROTOCOL.md §4: while active, HELP is re-sent every 60 s (each send is ×5 over 10 s). */
+    val sosActive: StateFlow<Boolean> = _sosActive.asStateFlow()
+    private var sosJob: Job? = null
+
+    fun startSos() {
+        if (sosJob?.isActive == true) return
+        _sosActive.value = true
+        sosJob = scope.launch {
+            while (isActive) {
+                send(Codebook.HELP, 0, Protocol.TARGET_BROADCAST)
+                delay(SOS_REPEAT_MS)
+            }
+        }
+    }
+
+    fun stopSos() {
+        sosJob?.cancel(); sosJob = null
+        _sosActive.value = false
+    }
 
     /** Send a codebook message. Returns the stored row, or null if not in a group or the arg is invalid. */
     suspend fun send(code: Int, arg: Int, target: Int): PingEntity? {
@@ -116,9 +146,10 @@ class PingRepository(
         Log.i(TAG, "TX name '$name' seq=${packet.seq}")
     }
 
-    suspend fun clear() = dao.clear()
+    suspend fun clear() { stopSos(); dao.clear() }
 
     private companion object {
         const val TAG = "Firefly/Ping"
+        const val SOS_REPEAT_MS = 60_000L
     }
 }

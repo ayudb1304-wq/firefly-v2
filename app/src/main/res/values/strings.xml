@@ -76,6 +76,14 @@
     <string name="codebook_here_hint">Sends where you are right now</string>
     <string name="codebook_no_pois">Load a venue pack to pick named places</string>
     <string name="codebook_minutes_hint">minutes</string>
+    <string name="codebook_hold">hold to send</string>
+    <string name="codebook_sos_hint">Press and hold SOS to alert the whole group. It repeats every minute until you cancel.</string>
+    <string name="sos_active">SOS is on — your group is being alerted every minute</string>
+    <string name="sos_cancel">Cancel SOS</string>
+    <string name="sos_incoming">SOS from %1$s</string>
+    <string name="sos_incoming_at">%1$s away %2$s · tap to reply</string>
+    <string name="sos_incoming_nopos">position unknown · tap to reply</string>
+    <string name="banner_dismiss">Dismiss</string>
 
     <!-- Timeline -->
     <string name="timeline_title">Messages</string>

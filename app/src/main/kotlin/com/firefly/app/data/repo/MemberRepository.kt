@@ -1,6 +1,8 @@
 package com.firefly.app.data.repo
 
+import com.firefly.app.core.geo.LatLon
 import com.firefly.app.core.protocol.Packet
+import com.firefly.app.core.routing.RelayPolicy
 import com.firefly.app.data.db.MemberDao
 import com.firefly.app.data.db.MemberEntity
 import kotlinx.coroutines.flow.Flow
@@ -28,6 +30,14 @@ class MemberRepository(private val dao: MemberDao) {
     }
 
     suspend fun name(senderId: Int): String? = dao.get(senderId)?.name
+
+    /** Last known position of a member, for the relay geo gate; null if never positioned. */
+    suspend fun targetInfo(senderId: Int): RelayPolicy.TargetInfo? {
+        val m = dao.get(senderId) ?: return null
+        val lat = m.lat ?: return null
+        val lon = m.lon ?: return null
+        return RelayPolicy.TargetInfo(LatLon(lat, lon), m.lastSeen)
+    }
 
     suspend fun clear() = dao.clear()
 }
