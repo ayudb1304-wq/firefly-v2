@@ -237,22 +237,24 @@ class FireflyService : Service() {
                     "rssi=${raw.rssi} target=${"%04X".format(packet.target)} pos=${if (packet.hasPosition) "${packet.latitude},${packet.longitude}" else "-"}",
             )
             if (packet.senderId == s.senderId) continue
-            container.memberRepository.onPacket(packet, raw.rssi, now)
-
-            val forMe = packet.isBroadcast || packet.target == s.senderId
-            when (packet.type) {
-                Protocol.Type.PING -> if (forMe) onPing(packet, raw.rssi, now)
-                Protocol.Type.ACK -> if (packet.target == s.senderId) container.pingRepository.onAck(packet, now)
+            try {
+                container.memberRepository.onPacket(packet, raw.rssi, now)
+                val forMe = packet.isBroadcast || packet.target == s.senderId
+                when (packet.type) {
+                    Protocol.Type.PING -> if (forMe) onPing(packet, raw.rssi, now)
+                    Protocol.Type.ACK -> if (packet.target == s.senderId) container.pingRepository.onAck(packet, now)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // One bad packet must not stop the pipeline (CLAUDE.md: the service owns the radio).
+                Log.e(TAG, "error handling packet from ${SenderId.hex(packet.senderId)}", e)
             }
         }
     }
 
     private suspend fun onPing(packet: Packet, rssi: Int, now: Long) {
         val ping = container.pingRepository.onIncoming(packet, rssi, now)
-        container.publishIncoming(ping)
-        val senderName = container.memberRepository.name(packet.senderId) ?: SenderId.hex(packet.senderId)
-        val poiName = container.venueRepository.venue.value?.pois?.firstOrNull { it.index == packet.arg }?.name
-        alerts.onPing(ping, senderName, PingText.describe(this, packet.code, packet.arg, poiName), app.inForeground)
         if (packet.ackRequested) {
             // Jitter so several receivers of a broadcast do not ACK in the same instant.
             scope.launch {
@@ -260,6 +262,13 @@ class FireflyService : Service() {
                 container.pingRepository.sendAck(packet, System.currentTimeMillis())
             }
         }
+        container.publishIncoming(ping)
+        // Alerting is best-effort: a haptics or notification failure must never take the radio down.
+        runCatching {
+            val senderName = container.memberRepository.name(packet.senderId) ?: SenderId.hex(packet.senderId)
+            val poiName = container.venueRepository.venue.value?.pois?.firstOrNull { it.index == packet.arg }?.name
+            alerts.onPing(ping, senderName, PingText.describe(this, packet.code, packet.arg, poiName), app.inForeground)
+        }.onFailure { Log.e(TAG, "alert failed", it) }
     }
 
     // ---------------- lifecycle ----------------
