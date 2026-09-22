@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.firefly.app.core.geo.FreeMap
+import com.firefly.app.core.geo.MapProjection
 import com.firefly.app.core.group.SenderId
 import com.firefly.app.core.protocol.AccuracyBucket
 import com.firefly.app.data.db.MemberEntity
@@ -55,9 +56,13 @@ fun VenueMap(
     val labelStyle = TextStyle(fontSize = 11.sp, color = OnMap, fontWeight = FontWeight.Medium)
     val poiStyle = TextStyle(fontSize = 10.sp, color = OnMap.copy(alpha = 0.75f))
     val hudStyle = TextStyle(fontSize = 10.sp, color = OnMap.copy(alpha = 0.8f))
-    val projection = frame.projection
-
     Canvas(modifier) {
+        val centre = frame.centre
+        val projection: MapProjection = frame.projection
+            ?: if (centre != null && frame.widthMetres != null && size.width > 0 && size.height > 0) {
+                MapProjection.centredOn(centre.lat, centre.lon, frame.widthMetres, size.width.roundToInt().coerceAtLeast(1), size.height.roundToInt().coerceAtLeast(1))
+            } else return@Canvas
+        drawRect(MapBackground)
         val scale = min(size.width / projection.imageWidth, size.height / projection.imageHeight)
         val drawnW = projection.imageWidth * scale
         val drawnH = projection.imageHeight * scale

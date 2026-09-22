@@ -26,10 +26,12 @@ import kotlinx.coroutines.launch
 
 /** What the map draws: either a venue image or a free grid, and the calibration for it. */
 data class MapFrame(
-    val projection: MapProjection,
+    /** Venue calibration when the venue image is shown; null in free-map mode. */
+    val projection: MapProjection?,
     /** Non-null when the venue image should be drawn under the dots. */
     val venue: VenuePack?,
-    /** Free-map width in metres (null when a venue is shown). */
+    /** Free-map centre and width in metres (null when a venue is shown). */
+    val centre: LatLon?,
     val widthMetres: Double?,
     /** Set when a venue pack is loaded but I am outside it. */
     val venueDistanceMetres: Double?,
@@ -81,20 +83,19 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
         val me = fix?.let { LatLon(it.lat, it.lon) }
         if (venue != null && me != null && venue.projection.contains(me.lat, me.lon)) {
             freeCentre = null; freeWidth = null
-            return@combine MapFrame(venue.projection, venue, null, null, waitingForFix = false)
+            return@combine MapFrame(venue.projection, venue, null, null, null, waitingForFix = false)
         }
         val positions = members.mapNotNull { m -> if (m.lat != null && m.lon != null) LatLon(m.lat, m.lon) else null }
         val anchor = me ?: freeCentre ?: positions.firstOrNull()
-            ?: return@combine MapFrame(FALLBACK, venue, FreeMap.MIN_WIDTH_M, null, waitingForFix = true)
+            ?: return@combine MapFrame(null, venue, null, FreeMap.MIN_WIDTH_M, null, waitingForFix = true)
 
         val farthest = positions.maxOfOrNull { GeoMath.distanceMetres(anchor.lat, anchor.lon, it.lat, it.lon) }
         val width = FreeMap.nextWidth(freeWidth, farthest).also { freeWidth = it }
         if (me != null && FreeMap.shouldRecentre(freeCentre, me, width)) freeCentre = me
         val centre = freeCentre ?: anchor.also { freeCentre = it }
-        val projection = MapProjection.centredOn(centre.lat, centre.lon, width, VIRTUAL_PX, VIRTUAL_PX)
         val venueDistance = venue?.let { v -> v.projection.centre().let { c -> GeoMath.distanceMetres(anchor.lat, anchor.lon, c.lat, c.lon) } }
-        MapFrame(projection, null, width, venueDistance, waitingForFix = false)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapFrame(FALLBACK, null, FreeMap.MIN_WIDTH_M, null, waitingForFix = true))
+        MapFrame(null, null, centre, width, venueDistance, waitingForFix = false)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MapFrame(null, null, null, FreeMap.MIN_WIDTH_M, null, waitingForFix = true))
 
     fun importVenue(uri: Uri) = viewModelScope.launch {
         container.venueRepository.importZip(uri)
@@ -114,8 +115,11 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
         onDone()
     }
 
-    private companion object {
-        const val VIRTUAL_PX = 1000
-        val FALLBACK: MapProjection = MapProjection.centredOn(0.0, 0.0, FreeMap.MIN_WIDTH_M, VIRTUAL_PX, VIRTUAL_PX)
-    }
+    /** Unread = incoming pings newer than the last time the timeline was opened. */
+    private val _timelineOpenedAt = MutableStateFlow(0L)
+    val unread: StateFlow<Int> = combine(pings, _timelineOpenedAt) { list, since ->
+        list.count { it.direction == PingEntity.IN && it.ts > since }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
+    fun markTimelineSeen() { _timelineOpenedAt.value = System.currentTimeMillis() }
 }

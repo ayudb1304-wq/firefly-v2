@@ -14,10 +14,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.HorizontalDivider as Divider
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -94,6 +103,8 @@ fun MapScreen(session: GroupSession) {
     }
     var sheetFor by remember { mutableStateOf<Recipient?>(null) }
     var showTimeline by remember { mutableStateOf(false) }
+    var confirmLeave by remember { mutableStateOf(false) }
+    val unread by vm.unread.collectAsStateWithLifecycle()
     var banner by remember { mutableStateOf<PingEntity?>(null) }
     val sosActive by vm.sosActive.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.incoming.collect { banner = it } }
@@ -110,6 +121,19 @@ fun MapScreen(session: GroupSession) {
         )
     }
     BackHandler(enabled = showTimeline) { showTimeline = false }
+    if (confirmLeave) {
+        AlertDialog(
+            onDismissRequest = { confirmLeave = false },
+            title = { Text(stringResource(R.string.leave_confirm_title, session.code)) },
+            text = { Text(stringResource(R.string.leave_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = { confirmLeave = false; FireflyService.stop(context); vm.leave {} }) {
+                    Text(stringResource(R.string.leave_confirm_yes), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmLeave = false }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     var showQr by remember { mutableStateOf(false) }
     if (showQr) com.firefly.app.ui.qr.GroupQrDialog(code = session.code, onDismiss = { showQr = false })
     if (showTimeline) {
@@ -142,12 +166,15 @@ fun MapScreen(session: GroupSession) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showTimeline = true }) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.timeline_title)) }
-                    TextButton(onClick = { FireflyService.stop(context); vm.leave {} }) { Text(stringResource(R.string.map_leave)) }
+                    IconButton(onClick = { vm.markTimelineSeen(); showTimeline = true }) {
+                        BadgedBox(badge = { if (unread > 0) Badge { Text("$unread") } }) {
+                            Icon(painterResource(R.drawable.ic_messages), contentDescription = stringResource(R.string.timeline_title))
+                        }
+                    }
+                    IconButton(onClick = { showQr = true }) { Icon(painterResource(R.drawable.ic_qr), contentDescription = stringResource(R.string.map_show_qr)) }
                     Box {
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.map_more)) }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(text = { Text(stringResource(R.string.map_show_qr)) }, onClick = { menuOpen = false; showQr = true })
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.map_load_venue)) },
                                 onClick = { menuOpen = false; pickVenue.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
@@ -158,6 +185,11 @@ fun MapScreen(session: GroupSession) {
                                     onClick = { menuOpen = false; vm.removeVenue() },
                                 )
                             }
+                            Divider()
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.map_leave), color = MaterialTheme.colorScheme.error) },
+                                onClick = { menuOpen = false; confirmLeave = true },
+                            )
                         }
                     }
                 },
@@ -211,33 +243,62 @@ fun MapScreen(session: GroupSession) {
                 frame.venueDistanceMetres != null -> stringResource(R.string.map_off_venue, Format.distance(frame.widthMetres), Format.distance(frame.venueDistanceMetres))
                 else -> stringResource(R.string.map_free, Format.distance(frame.widthMetres))
             }
-            Text(caption, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.tertiary)
-            Box(Modifier.fillMaxWidth().heightIn(min = 240.dp).weight(1f), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 240.dp).weight(1f).background(Color(0xFF161B23)), contentAlignment = Alignment.Center) {
                 if (!frame.waitingForFix) {
                     VenueMap(frame = frame, me = me, members = members, nowMillis = now, modifier = Modifier.fillMaxSize())
                 } else {
-                    Text(stringResource(R.string.map_waiting_fix_body), Modifier.padding(24.dp), style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.map_waiting_fix_body), Modifier.padding(24.dp), style = MaterialTheme.typography.bodyMedium, color = Color(0xFFECE6DA))
                 }
+                Text(
+                    caption,
+                    Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99161B23), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall, color = Color(0xFFECE6DA),
+                )
             }
             StatusRow(
                 radio = radio, meFixAgeMillis = me?.let { now - it.timeMillis }, accuracy = me?.accuracyMetres,
                 nearby = members.count { now - it.lastSeen <= 60_000L }, myId = SenderId.hex(session.senderId),
             )
             HorizontalDivider()
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 240.dp)) {
                 if (members.isEmpty()) {
-                    item { Text(stringResource(R.string.map_no_members), Modifier.padding(16.dp), style = MaterialTheme.typography.bodyMedium) }
+                    item {
+                        Column(Modifier.padding(16.dp)) {
+                            Text(stringResource(R.string.map_no_members_title), style = MaterialTheme.typography.titleSmall)
+                            Text(stringResource(R.string.map_no_members), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+                        }
+                    }
                 }
                 items(members, key = { it.senderId }) { m ->
                     val myFix = me
+                    val label = m.name ?: SenderId.hex(m.senderId)
                     val dist = if (myFix != null && m.lat != null && m.lon != null) GeoMath.distanceMetres(myFix.lat, myFix.lon, m.lat, m.lon) else null
                     val bearing = if (dist != null) GeoMath.bearingDegrees(myFix!!.lat, myFix.lon, m.lat!!, m.lon!!) else null
+                    val fresh = now - m.lastSeen <= 60_000L
                     ListItem(
-                        headlineContent = { Text(m.name ?: SenderId.hex(m.senderId)) },
-                        supportingContent = {
-                            Text("${Format.distance(dist)} ${Format.bearingArrow(bearing)} · ${Format.age(now, m.lastSeen)} · ${m.hops} hop · ${m.rssi} dBm")
+                        leadingContent = {
+                            Box(
+                                Modifier.size(40.dp).background(if (fresh) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(label.take(1).uppercase(), color = if (fresh) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) }
                         },
-                        modifier = Modifier.clickable { sheetFor = Recipient(m.senderId, m.name ?: SenderId.hex(m.senderId)) },
+                        headlineContent = { Text(label, fontWeight = FontWeight.SemiBold) },
+                        supportingContent = {
+                            Text(
+                                listOf(
+                                    Format.age(now, m.lastSeen),
+                                    if (m.hops > 0) stringResource(R.string.member_hops, m.hops) else stringResource(R.string.member_direct),
+                                ).joinToString(" · "),
+                            )
+                        },
+                        trailingContent = {
+                            Text(
+                                if (dist != null) "${Format.distance(dist)} ${Format.bearingArrow(bearing)}" else stringResource(R.string.member_no_position),
+                                style = if (dist != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelSmall,
+                                color = if (fresh) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            )
+                        },
+                        modifier = Modifier.clickable { sheetFor = Recipient(m.senderId, label) },
                     )
                 }
             }

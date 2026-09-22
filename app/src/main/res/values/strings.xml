@@ -29,7 +29,16 @@
     <!-- Map -->
     <string name="map_group">Group %1$s</string>
     <string name="map_subtitle">You are %1$s · %2$d heard</string>
-    <string name="map_leave">Leave</string>
+    <string name="map_leave">Leave group</string>
+    <string name="leave_confirm_title">Leave group %1$s?</string>
+    <string name="leave_confirm_body">Your friends will stop seeing you and this phone\'s messages and positions for the group are deleted.</string>
+    <string name="leave_confirm_yes">Leave</string>
+    <string name="cancel">Cancel</string>
+    <string name="member_last_seen">%1$s</string>
+    <string name="member_hops">via %1$d hop</string>
+    <string name="member_direct">direct</string>
+    <string name="member_no_position">no position yet</string>
+    <string name="map_no_members_title">Waiting for friends</string>
     <string name="map_more">More</string>
     <string name="map_show_qr">Show group QR</string>
     <string name="qr_title">Group %1$s</string>
