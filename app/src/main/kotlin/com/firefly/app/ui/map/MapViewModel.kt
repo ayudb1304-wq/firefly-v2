@@ -7,16 +7,20 @@ import com.firefly.app.core.geo.FreeMap
 import com.firefly.app.core.geo.GeoMath
 import com.firefly.app.core.geo.LatLon
 import com.firefly.app.core.geo.MapProjection
+import com.firefly.app.core.group.SenderId
 import com.firefly.app.data.db.MemberEntity
+import com.firefly.app.data.db.PingEntity
 import com.firefly.app.di.AppContainer
 import com.firefly.app.location.Fix
 import com.firefly.app.radio.RadioStatus
 import com.firefly.app.venue.VenuePack
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -43,6 +47,20 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
     val radio: StateFlow<RadioStatus> = container.radioStatus.status
 
     val venue: StateFlow<VenuePack?> = container.venueRepository.venue
+
+    val pings: StateFlow<List<PingEntity>> =
+        container.pingRepository.timeline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** senderId → display name (hex ID when unknown). */
+    val names: StateFlow<Map<Int, String>> = members.map { list ->
+        list.associate { it.senderId to (it.name ?: SenderId.hex(it.senderId)) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val incoming: SharedFlow<PingEntity> = container.incomingPings
+
+    fun send(code: Int, arg: Int, target: Int) = viewModelScope.launch {
+        if (container.pingRepository.send(code, arg, target) == null) _message.value = "Could not send"
+    }
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()

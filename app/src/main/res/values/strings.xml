@@ -9,6 +9,8 @@
     <string name="home_code_label">Group code</string>
     <string name="home_code_hint">6 letters or digits from your friend</string>
     <string name="home_code_invalid">That is not a valid code (no 0, O, 1 or I)</string>
+    <string name="home_name_label">Your name</string>
+    <string name="home_name_hint">Up to 8 letters, shown on friends\' maps</string>
 
     <!-- Onboarding -->
     <string name="onboarding_title">Before we start</string>
@@ -29,6 +31,14 @@
     <string name="map_subtitle">You are %1$s · %2$d heard</string>
     <string name="map_leave">Leave</string>
     <string name="map_more">More</string>
+    <string name="map_show_qr">Show group QR</string>
+    <string name="qr_title">Group %1$s</string>
+    <string name="qr_hint">Friends scan this from Firefly → Scan QR, or type the code.</string>
+    <string name="qr_close">Close</string>
+    <string name="home_scan_qr">Scan QR</string>
+    <string name="scan_title">Scan a group QR</string>
+    <string name="scan_hint">Point at a friend\'s group QR code</string>
+    <string name="scan_camera_denied">Camera permission is needed to scan. You can still type the code.</string>
     <string name="map_load_venue">Load venue pack (zip)…</string>
     <string name="map_remove_venue">Remove venue: %1$s</string>
     <string name="map_free">Free map · %1$s across · north up</string>
@@ -37,9 +47,51 @@
     <string name="map_waiting_fix_body">Go outside or near a window. The map appears as soon as your phone or a friend\'s has a position.</string>
     <string name="map_no_members">No one heard yet. Friends who join with the same code appear here.</string>
 
+    <string name="map_send">Send</string>
+    <string name="everyone">Everyone</string>
+    <string name="back">Back</string>
+    <string name="banner_tap_to_reply">Tap to reply</string>
+
+    <!-- Codebook (PRD C3) -->
+    <string name="code_where_are_you">Where are you?</string>
+    <string name="code_meet_at">Meet at…</string>
+    <string name="code_on_my_way">On my way</string>
+    <string name="code_stay_there">Stay where you are</string>
+    <string name="code_going_to">Going to…</string>
+    <string name="code_back_in">Back in…</string>
+    <string name="code_help">HELP / SOS</string>
+    <string name="code_lighthouse">Lighthouse on</string>
+    <string name="code_ack">OK</string>
+    <string name="code_low_battery">Low battery</string>
+    <string name="code_call_me">Call me if you can</string>
+    <string name="code_leaving">Leaving venue</string>
+    <string name="code_unknown">Message</string>
+    <string name="arg_here_fmt">%1$s my position</string>
+    <string name="arg_poi_fmt">%1$s %2$s</string>
+    <string name="arg_poi_number">point %1$d</string>
+    <string name="arg_minutes_fmt">%1$s %2$d min</string>
+    <string name="codebook_to">To</string>
+    <string name="codebook_back">‹ Back</string>
+    <string name="codebook_here">Here (my position)</string>
+    <string name="codebook_here_hint">Sends where you are right now</string>
+    <string name="codebook_no_pois">Load a venue pack to pick named places</string>
+    <string name="codebook_minutes_hint">minutes</string>
+
+    <!-- Timeline -->
+    <string name="timeline_title">Messages</string>
+    <string name="timeline_empty">No messages yet. Tap Send on the map.</string>
+    <string name="timeline_from">From %1$s</string>
+    <string name="timeline_to">To %1$s</string>
+    <string name="timeline_sent">sent</string>
+    <string name="timeline_seen">seen by %1$d</string>
+    <string name="timeline_via_hops">via %1$d hop(s)</string>
+
     <!-- Service notification -->
     <string name="notif_channel">Firefly radio</string>
     <string name="notif_channel_desc">Shown while Firefly shares your position with your group</string>
     <string name="notif_title">Firefly is on</string>
     <string name="notif_text">Sharing your position with your group over Bluetooth</string>
+    <string name="notif_pings_channel">Messages from your group</string>
+    <string name="notif_sos_channel">SOS alerts</string>
+    <string name="notif_sos_title">SOS from %1$s</string>
 </resources>

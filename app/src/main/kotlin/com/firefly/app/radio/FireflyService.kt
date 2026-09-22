@@ -21,6 +21,7 @@ import com.firefly.app.FireflyApp
 import com.firefly.app.MainActivity
 import com.firefly.app.R
 import com.firefly.app.core.group.SenderId
+import com.firefly.app.core.messaging.NamePolicy
 import com.firefly.app.core.protocol.AccuracyBucket
 import com.firefly.app.core.protocol.BeaconPolicy
 import com.firefly.app.core.protocol.Packet
@@ -30,39 +31,49 @@ import com.firefly.app.core.protocol.toHexSpaced
 import com.firefly.app.core.routing.DedupeCache
 import com.firefly.app.data.repo.GroupSession
 import com.firefly.app.location.Fix
+import com.firefly.app.ui.codebook.PingText
 import com.firefly.app.ui.common.Permissions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 
 /**
  * Foreground service that owns the radio (ARCHITECTURE.md §4, §6).
- * Advertises our own BEACON, scans for the group's packets, updates members.
- * Relaying arrives in Phase 3; the dedupe step already runs before anything else.
+ * Advertises our own BEACON, bursts queued pings/ACKs/names, scans for the
+ * group's packets, updates members and the timeline. Relaying arrives in Phase 3;
+ * the dedupe step already runs before anything else.
  */
 class FireflyService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val container get() = (application as FireflyApp).container
+    private val app get() = application as FireflyApp
+    private val container get() = app.container
     private val status get() = container.radioStatus
 
     private var adapter: BluetoothAdapter? = null
     private var advertiser: Advertiser? = null
     private var scanner: Scanner? = null
     private lateinit var battery: BatteryLogger
+    private lateinit var alerts: Alerts
     private val dedupe = DedupeCache()
-    private val inbound = Channel<RawAdvert>(capacity = 256, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST)
+    private val inbound = Channel<RawAdvert>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /** Only one thing is on air at a time: own beacon updates wait for bursts to finish. */
+    private val airtime = Mutex()
 
     private var session: GroupSession? = null
-    /** Per-sender sequence. Starts random so a restart within the dedupe TTL does not collide (DECISIONS.md). */
-    private var seq = Random.nextInt(0, 0x10000)
 
     private val btReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -76,6 +87,7 @@ class FireflyService : Service() {
     override fun onCreate() {
         super.onCreate()
         battery = BatteryLogger(this)
+        alerts = Alerts(this)
         adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
         ContextCompat.registerReceiver(this, btReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
     }
@@ -106,6 +118,8 @@ class FireflyService : Service() {
         startRadio()
         scope.launch { pipeline() }
         scope.launch { beaconLoop() }
+        scope.launch { txLoop() }
+        scope.launch { nameLoop() }
     }
 
     private fun startRadio() {
@@ -134,14 +148,49 @@ class FireflyService : Service() {
     // ---------------- outbound ----------------
 
     private suspend fun beaconLoop() {
-        // startRadio() already put the first beacon on air.
-        status.update { it.copy(packetsSent = it.packetsSent + 1) }
+        status.update { it.copy(packetsSent = it.packetsSent + 1) } // the beacon startRadio() put on air
         while (scope.isActive) {
             val fix = container.locationSource.fixes.value
             delay(BeaconPolicy.nextIntervalMillis(fix?.speedMps, AccuracyBucket.fromMetres(fix?.accuracyMetres)))
-            advertiser?.let { adv ->
+            val adv = advertiser ?: continue
+            airtime.withLock {
                 adv.update(currentBeacon())
                 status.update { it.copy(packetsSent = it.packetsSent + 1) }
+            }
+        }
+    }
+
+    /** Drain the transmit queue: priority lane first, each request as N bursts of [BURST_MS]. */
+    private suspend fun txLoop() {
+        val q = container.txQueue
+        while (scope.isActive) {
+            val req = q.priority.tryReceive().getOrNull() ?: select<TxRequest> {
+                q.priority.onReceive { it }
+                q.normal.onReceive { it }
+            }
+            for (i in 0 until req.repeats) {
+                val adv = advertiser
+                if (adv == null) { Log.w(TAG, "radio down, dropping ${req.label}"); break }
+                airtime.withLock {
+                    adv.update(req.bytes)
+                    status.update { it.copy(packetsSent = it.packetsSent + 1) }
+                    delay(BURST_MS)
+                    adv.update(currentBeacon())
+                }
+                if (i < req.repeats - 1) delay((req.spacingMillis - BURST_MS).coerceAtLeast(0))
+            }
+        }
+    }
+
+    /** NAME packets on the PRD A2 schedule whenever a display name is set. */
+    private suspend fun nameLoop() {
+        container.settings.displayName.collectLatest { raw ->
+            val name = NamePolicy.sanitise(raw.orEmpty())
+            if (name.isEmpty()) return@collectLatest
+            while (scope.isActive) {
+                container.pingRepository.sendName(name)
+                val joined = container.settings.joinedAt.first() ?: System.currentTimeMillis()
+                delay(NamePolicy.intervalMillis(System.currentTimeMillis() - joined))
             }
         }
     }
@@ -153,7 +202,7 @@ class FireflyService : Service() {
             type = Protocol.Type.BEACON,
             groupId = s.groupId,
             senderId = s.senderId,
-            seq = nextSeq(),
+            seq = container.seqCounter.next(),
             ttl = Protocol.Ttl.DEFAULT,
             hops = 0,
             latE6 = fix?.let { Packet.toE6(it.lat) } ?: 0,
@@ -163,8 +212,6 @@ class FireflyService : Service() {
         )
         return PacketCodec.encode(packet)
     }
-
-    private fun nextSeq(): Int { seq = (seq + 1) and 0xFFFF; return seq }
 
     // ---------------- inbound ----------------
 
@@ -186,11 +233,32 @@ class FireflyService : Service() {
             status.update { it.copy(packetsReceived = it.packetsReceived + 1, lastPacketAtMillis = now) }
             Log.i(
                 TAG,
-                "RX type=${packet.type} from=${SenderId.hex(packet.senderId)} seq=${packet.seq} hops=${packet.hops} ttl=${packet.ttl} " +
-                    "rssi=${raw.rssi} acc=${packet.accuracyBucket} pos=${if (packet.hasPosition) "${packet.latitude},${packet.longitude}" else "-"}",
+                "RX type=${packet.type} code=${packet.code} from=${SenderId.hex(packet.senderId)} seq=${packet.seq} hops=${packet.hops} ttl=${packet.ttl} " +
+                    "rssi=${raw.rssi} target=${"%04X".format(packet.target)} pos=${if (packet.hasPosition) "${packet.latitude},${packet.longitude}" else "-"}",
             )
             if (packet.senderId == s.senderId) continue
             container.memberRepository.onPacket(packet, raw.rssi, now)
+
+            val forMe = packet.isBroadcast || packet.target == s.senderId
+            when (packet.type) {
+                Protocol.Type.PING -> if (forMe) onPing(packet, raw.rssi, now)
+                Protocol.Type.ACK -> if (packet.target == s.senderId) container.pingRepository.onAck(packet, now)
+            }
+        }
+    }
+
+    private suspend fun onPing(packet: Packet, rssi: Int, now: Long) {
+        val ping = container.pingRepository.onIncoming(packet, rssi, now)
+        container.publishIncoming(ping)
+        val senderName = container.memberRepository.name(packet.senderId) ?: SenderId.hex(packet.senderId)
+        val poiName = container.venueRepository.venue.value?.pois?.firstOrNull { it.index == packet.arg }?.name
+        alerts.onPing(ping, senderName, PingText.describe(this, packet.code, packet.arg, poiName), app.inForeground)
+        if (packet.ackRequested) {
+            // Jitter so several receivers of a broadcast do not ACK in the same instant.
+            scope.launch {
+                delay(Random.nextLong(ACK_JITTER_MIN_MS, ACK_JITTER_MAX_MS))
+                container.pingRepository.sendAck(packet, System.currentTimeMillis())
+            }
         }
     }
 
@@ -240,6 +308,11 @@ class FireflyService : Service() {
         private const val CHANNEL_ID = "firefly_radio"
         private const val NOTIFICATION_ID = 1
         const val ACTION_STOP = "com.firefly.app.action.STOP"
+
+        /** How long a queued packet replaces the beacon on air per repeat (≈2–3 adverts at 250 ms). */
+        const val BURST_MS = 600L
+        const val ACK_JITTER_MIN_MS = 150L
+        const val ACK_JITTER_MAX_MS = 700L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, FireflyService::class.java))

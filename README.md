@@ -4,7 +4,7 @@ Offline friend-finding for large crowds. No signal needed.
 
 Phones broadcast a 24-byte BLE advertisement with their GPS position and a short coded message. Every Firefly phone nearby relays it. A map shows where your group is (a free grid anywhere, or an organiser's venue map if you load one); the app suggests a meeting point; a screen-flash "lighthouse" gets you the last 30 metres.
 
-**Status:** Phase 1 built (beacons, scanner, map); awaiting the two-phone field test — see `docs/ROADMAP.md`. Target pilot: Lollapalooza India 2027.
+**Status:** Phase 2 built (codebook pings with ACKs, timeline, names, QR join); Phase 2 exit test on two phones pending — see `docs/ROADMAP.md`. Target pilot: Lollapalooza India 2027.
 
 ## Quick start (developer)
 Requires JDK 17+ and the Android SDK (platform 37.2, build-tools 37.0.0). Android Studio installs both; without it, `brew install openjdk@21 android-commandlinetools` and set `sdk.dir` in `local.properties`.

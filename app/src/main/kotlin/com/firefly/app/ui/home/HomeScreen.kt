@@ -17,6 +17,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import com.firefly.app.ui.qr.ScanScreen
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,8 +40,13 @@ import com.firefly.app.core.group.GroupCode
 @Composable
 fun HomeScreen() {
     val app = LocalContext.current.applicationContext as FireflyApp
-    val vm: HomeViewModel = viewModel { HomeViewModel(app.container.groupRepository) }
+    val vm: HomeViewModel = viewModel { HomeViewModel(app.container.groupRepository, app.container.settings) }
     val state by vm.state.collectAsStateWithLifecycle()
+    var scanning by remember { mutableStateOf(false) }
+    if (scanning) {
+        ScanScreen(onCode = { code -> scanning = false; vm.joinScanned(code) }, onBack = { scanning = false })
+        return
+    }
 
     Scaffold { innerPadding ->
         Column(
@@ -49,7 +60,17 @@ fun HomeScreen() {
             Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displayMedium, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Text(stringResource(R.string.home_tagline), style = MaterialTheme.typography.bodyLarge)
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(32.dp))
+
+            OutlinedTextField(
+                value = state.name,
+                onValueChange = vm::onName,
+                label = { Text(stringResource(R.string.home_name_label)) },
+                supportingText = { Text(stringResource(R.string.home_name_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(16.dp))
 
             Button(onClick = vm::create, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.home_create_group))
@@ -70,11 +91,17 @@ fun HomeScreen() {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = vm::join,
-                enabled = !state.busy && GroupCode.normalise(state.joinInput) != null,
-                modifier = Modifier.fillMaxWidth(),
-            ) { Text(stringResource(R.string.home_join_group)) }
+            Row(Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = vm::join,
+                    enabled = !state.busy && GroupCode.normalise(state.joinInput) != null,
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(R.string.home_join_group)) }
+                Spacer(Modifier.width(12.dp))
+                OutlinedButton(onClick = { scanning = true }, enabled = !state.busy, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.home_scan_qr))
+                }
+            }
         }
     }
 }

@@ -1,7 +1,9 @@
 package com.firefly.app.ui.map
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,7 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,7 +56,12 @@ import com.firefly.app.core.group.SenderId
 import com.firefly.app.data.repo.GroupSession
 import com.firefly.app.radio.FireflyService
 import com.firefly.app.radio.RadioStatus
+import com.firefly.app.ui.codebook.CodebookSheet
+import com.firefly.app.ui.codebook.PingText
+import com.firefly.app.ui.codebook.Recipient
 import com.firefly.app.ui.common.Format
+import com.firefly.app.ui.timeline.TimelineScreen
+import com.firefly.app.data.db.PingEntity
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -73,8 +85,48 @@ fun MapScreen(session: GroupSession) {
     val pickVenue = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importVenue) }
     var menuOpen by remember { mutableStateOf(false) }
 
+    val pings by vm.pings.collectAsStateWithLifecycle()
+    val names by vm.names.collectAsStateWithLifecycle()
+    val everyone = stringResource(R.string.everyone)
+    val recipients = remember(members, names, everyone) {
+        listOf(Recipient.everyone(everyone)) + members.map { Recipient(it.senderId, names[it.senderId] ?: SenderId.hex(it.senderId)) }
+    }
+    var sheetFor by remember { mutableStateOf<Recipient?>(null) }
+    var showTimeline by remember { mutableStateOf(false) }
+    var banner by remember { mutableStateOf<PingEntity?>(null) }
+    LaunchedEffect(Unit) { vm.incoming.collect { banner = it } }
+    LaunchedEffect(banner) { if (banner != null) { delay(8_000); banner = null } }
+
+    sheetFor?.let { r ->
+        CodebookSheet(
+            recipients = recipients,
+            initialRecipient = r,
+            pois = venue?.pois.orEmpty(),
+            onSend = { code, arg, target -> vm.send(code, arg, target); sheetFor = null },
+            onDismiss = { sheetFor = null },
+        )
+    }
+    BackHandler(enabled = showTimeline) { showTimeline = false }
+    var showQr by remember { mutableStateOf(false) }
+    if (showQr) com.firefly.app.ui.qr.GroupQrDialog(code = session.code, onDismiss = { showQr = false })
+    if (showTimeline) {
+        TimelineScreen(
+            pings = pings, names = names, pois = venue?.pois.orEmpty(), nowMillis = now,
+            onReply = { id -> showTimeline = false; sheetFor = recipients.firstOrNull { it.senderId == id } ?: Recipient(id, names[id] ?: SenderId.hex(id)) },
+            onBack = { showTimeline = false },
+        )
+        return
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = { sheetFor = recipients.first() },
+                icon = { Icon(Icons.Default.Send, contentDescription = null) },
+                text = { Text(stringResource(R.string.map_send)) },
+            )
+        },
         topBar = {
             TopAppBar(
                 title = {
@@ -87,10 +139,12 @@ fun MapScreen(session: GroupSession) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showTimeline = true }) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = stringResource(R.string.timeline_title)) }
                     TextButton(onClick = { FireflyService.stop(context); vm.leave {} }) { Text(stringResource(R.string.map_leave)) }
                     Box {
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.map_more)) }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(text = { Text(stringResource(R.string.map_show_qr)) }, onClick = { menuOpen = false; showQr = true })
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.map_load_venue)) },
                                 onClick = { menuOpen = false; pickVenue.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) },
@@ -108,6 +162,20 @@ fun MapScreen(session: GroupSession) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            banner?.let { b ->
+                val from = names[b.senderId] ?: SenderId.hex(b.senderId)
+                val poiName = venue?.pois?.firstOrNull { it.index == b.arg }?.name
+                Card(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp).clickable { banner = null; sheetFor = recipients.firstOrNull { it.senderId == b.senderId } ?: Recipient(b.senderId, from) },
+                    colors = CardDefaults.cardColors(containerColor = if (b.code == com.firefly.app.core.protocol.Codebook.HELP) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer),
+                ) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(from, style = MaterialTheme.typography.labelMedium)
+                        Text(PingText.describe(context, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.banner_tap_to_reply), style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
             val caption = when {
                 frame.waitingForFix -> stringResource(R.string.map_waiting_fix)
                 frame.venue != null -> frame.venue!!.name
@@ -137,6 +205,7 @@ fun MapScreen(session: GroupSession) {
                         supportingContent = {
                             Text("${Format.distance(dist)} ${Format.bearingArrow(bearing)} · ${Format.age(now, m.lastSeen)} · ${m.hops} hop · ${m.rssi} dBm")
                         },
+                        modifier = Modifier.clickable { sheetFor = Recipient(m.senderId, m.name ?: SenderId.hex(m.senderId)) },
                     )
                 }
             }

@@ -27,5 +27,7 @@ class MemberRepository(private val dao: MemberDao) {
         )
     }
 
+    suspend fun name(senderId: Int): String? = dao.get(senderId)?.name
+
     suspend fun clear() = dao.clear()
 }
