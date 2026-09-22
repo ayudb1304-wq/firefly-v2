@@ -75,17 +75,19 @@ Every node runs this on each received advert:
 ## 8. Worked example
 Priya (senderId 0x1A2B, at 19.0760, 72.8777) sends "Meet at POI 4" to Rahul (0x3C4D):
 ```
-00            ver 0, type PING
+01            ver 0, type PING
 9F 8C 21 07   groupId
 1A 2B         senderId
 00 2A         seq 42
 60            TTL 6, hops 0
-01 22 F0 60   lat 19076000
-04 57 26 C8   lon 72877700
+01 23 13 A0   lat 19076000
+04 58 06 84   lon 72877700
 42            flags: ACK requested, accuracy bucket 2
 02            code MEET_AT
 04            arg POI 4
 3C 4D         target Rahul
 7B            ts
 ```
+(These bytes are asserted by `PacketCodecTest`.)
+
 Rahul's phone receives it (possibly via 3 hops), shows the banner, replies with ACK (type 0x3, arg 0x2A, target 0x1A2B).

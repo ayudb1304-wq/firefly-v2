@@ -10,6 +10,9 @@ interface MemberDao {
     @Query("SELECT * FROM members ORDER BY lastSeen DESC")
     fun observeAll(): Flow<List<MemberEntity>>
 
+    @Query("SELECT * FROM members WHERE senderId = :senderId")
+    suspend fun get(senderId: Int): MemberEntity?
+
     @Upsert
     suspend fun upsert(member: MemberEntity)
 

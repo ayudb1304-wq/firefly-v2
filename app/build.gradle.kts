@@ -66,6 +66,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.play.services.location)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

@@ -24,6 +24,11 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setDisplayName(name: String) = dataStore.edit { it[Keys.DISPLAY_NAME] = name }
     suspend fun setKeepLog(keep: Boolean) = dataStore.edit { it[Keys.KEEP_LOG] = keep }
 
+    suspend fun setGroup(code: String, senderId: Int) = dataStore.edit {
+        it[Keys.GROUP_CODE] = code
+        it[Keys.SENDER_ID] = senderId
+    }
+
     /** Called on "Leave group": wipes group identity so a fresh senderId is generated. */
     suspend fun clearGroup() = dataStore.edit {
         it.remove(Keys.GROUP_CODE)

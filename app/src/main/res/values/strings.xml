@@ -1,8 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Firefly</string>
+
+    <!-- Home -->
     <string name="home_tagline">Find your friends. No signal needed.</string>
     <string name="home_create_group">Create group</string>
     <string name="home_join_group">Join group</string>
-    <string name="home_phase_note">Phase 0 scaffold — groups arrive in Phase 1</string>
+    <string name="home_code_label">Group code</string>
+    <string name="home_code_hint">6 letters or digits from your friend</string>
+    <string name="home_code_invalid">That is not a valid code (no 0, O, 1 or I)</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Before we start</string>
+    <string name="onboarding_intro">Firefly works with no mobile signal. It needs a few permissions to talk to nearby phones and place you on the venue map.</string>
+    <string name="onboarding_bt_title">Nearby devices (Bluetooth)</string>
+    <string name="onboarding_bt_body">Your phone broadcasts a tiny Bluetooth signal with your position and relays your friends\' signals. No pairing, no connections.</string>
+    <string name="onboarding_loc_title">Precise location</string>
+    <string name="onboarding_loc_body">GPS puts your dot on the map. Android also requires location permission for Bluetooth scanning.</string>
+    <string name="onboarding_notif_title">Notifications</string>
+    <string name="onboarding_notif_body">A persistent notification keeps Firefly running while your screen is off.</string>
+    <string name="onboarding_privacy">Your position is only shared with the group you join, is not encrypted in this test build, and is never stored after you leave the group. There is no server: Firefly does not even have internet permission.</string>
+    <string name="onboarding_grant">Grant permissions</string>
+    <string name="onboarding_denied">Firefly cannot work without these. Please allow them in Settings.</string>
+    <string name="onboarding_open_settings">Open app settings</string>
+
+    <!-- Map -->
+    <string name="map_group">Group %1$s</string>
+    <string name="map_subtitle">You are %1$s · %2$d heard</string>
+    <string name="map_leave">Leave</string>
+    <string name="map_no_members">No one heard yet. Friends who join with the same code appear here.</string>
+
+    <!-- Service notification -->
+    <string name="notif_channel">Firefly radio</string>
+    <string name="notif_channel_desc">Shown while Firefly shares your position with your group</string>
+    <string name="notif_title">Firefly is on</string>
+    <string name="notif_text">Sharing your position with your group over Bluetooth</string>
 </resources>

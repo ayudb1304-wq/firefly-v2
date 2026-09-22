@@ -1,0 +1,84 @@
+{
+  "name": "Example Venue (placeholder grid \u2014 replace with surveyed map)",
+  "image": "map.png",
+  "corners": {
+    "tl": [
+      19.0,
+      72.82
+    ],
+    "tr": [
+      19.0,
+      72.83
+    ],
+    "bl": [
+      18.99,
+      72.82
+    ],
+    "br": [
+      18.99,
+      72.83
+    ]
+  },
+  "pois": [
+    {
+      "i": 1,
+      "name": "Main Stage",
+      "lat": 18.995,
+      "lon": 72.825
+    },
+    {
+      "i": 2,
+      "name": "Second Stage",
+      "lat": 18.993,
+      "lon": 72.8285
+    },
+    {
+      "i": 3,
+      "name": "Bar 1",
+      "lat": 18.996,
+      "lon": 72.823
+    },
+    {
+      "i": 4,
+      "name": "Bar 2",
+      "lat": 18.994,
+      "lon": 72.827
+    },
+    {
+      "i": 5,
+      "name": "Food Court",
+      "lat": 18.992,
+      "lon": 72.824
+    },
+    {
+      "i": 6,
+      "name": "Toilets North",
+      "lat": 18.9975,
+      "lon": 72.826
+    },
+    {
+      "i": 7,
+      "name": "Toilets South",
+      "lat": 18.991,
+      "lon": 72.826
+    },
+    {
+      "i": 8,
+      "name": "Medical Tent",
+      "lat": 18.9955,
+      "lon": 72.829
+    },
+    {
+      "i": 9,
+      "name": "Main Gate",
+      "lat": 18.9905,
+      "lon": 72.8215
+    },
+    {
+      "i": 10,
+      "name": "Info / Lost & Found",
+      "lat": 18.9945,
+      "lon": 72.822
+    }
+  ]
+}
