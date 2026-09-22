@@ -75,6 +75,7 @@ fun MapScreen(session: GroupSession) {
     val radio by vm.radio.collectAsStateWithLifecycle()
     val frame by vm.frame.collectAsStateWithLifecycle()
     val venue by vm.venue.collectAsStateWithLifecycle()
+    val myName by vm.myName.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val now by produceState(System.currentTimeMillis()) {
         while (true) { delay(1_000); value = System.currentTimeMillis() }
@@ -135,7 +136,7 @@ fun MapScreen(session: GroupSession) {
                     Column {
                         Text(stringResource(R.string.map_group, session.code))
                         Text(
-                            stringResource(R.string.map_subtitle, SenderId.hex(session.senderId), members.size),
+                            stringResource(R.string.map_subtitle, myName?.let { "$it (${SenderId.hex(session.senderId)})" } ?: SenderId.hex(session.senderId), members.size),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }

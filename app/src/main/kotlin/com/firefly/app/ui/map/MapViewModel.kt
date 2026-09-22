@@ -48,6 +48,10 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
 
     val venue: StateFlow<VenuePack?> = container.venueRepository.venue
 
+    val myName: StateFlow<String?> = container.settings.displayName
+        .map { it?.takeIf { n -> n.isNotBlank() } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     val pings: StateFlow<List<PingEntity>> =
         container.pingRepository.timeline.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
