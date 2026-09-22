@@ -22,8 +22,9 @@ Read these before writing any code, in this order:
 - Tests: JUnit5 + kotlinx-coroutines-test for unit tests; Compose UI tests only for critical screens.
 
 ## Package layout
+Kotlin package is `com.firefly.app` (the Play application ID is `in.firefly.app`; `in` is a Kotlin keyword — see `docs/DECISIONS.md`). `core/` lives in its own Gradle module `:core`.
 ```
-in.firefly.app
+com.firefly.app
 ├── core/        # pure Kotlin, no Android deps: packet codec, routing logic, geo maths, codebook
 ├── radio/       # BLE advertise/scan, foreground service, duty cycling
 ├── location/    # GPS wrapper

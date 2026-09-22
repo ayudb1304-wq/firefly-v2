@@ -10,3 +10,5 @@ captures/
 .cxx/
 .DS_Store
 .claude/settings.local.json
+.kotlin/
+*.hprof

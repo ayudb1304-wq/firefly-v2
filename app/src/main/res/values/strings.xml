@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Firefly</string>
+    <string name="home_tagline">Find your friends. No signal needed.</string>
+    <string name="home_create_group">Create group</string>
+    <string name="home_join_group">Join group</string>
+    <string name="home_phase_note">Phase 0 scaffold — groups arrive in Phase 1</string>
+</resources>
