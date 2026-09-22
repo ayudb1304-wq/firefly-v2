@@ -48,6 +48,35 @@
     <string name="map_no_members">No one heard yet. Friends who join with the same code appear here.</string>
 
     <string name="map_send">Send</string>
+
+    <!-- Status line and details panel -->
+    <string name="status_problem">Problem: %1$s</string>
+    <string name="status_starting">Starting radio…</string>
+    <string name="status_ok">Sharing with your group</string>
+    <string name="status_gps_none">no GPS yet</string>
+    <string name="status_gps">GPS ±%1$d m</string>
+    <string name="status_friends">%1$d nearby</string>
+    <string name="status_tap">Tap for details</string>
+    <string name="status_details_title">Radio details</string>
+    <string name="status_bt_advertising">Broadcasting my position</string>
+    <string name="status_bt_scanning">Listening for friends</string>
+    <string name="status_on">on</string>
+    <string name="status_off">off</string>
+    <string name="status_off_pause">paused (normal: listens 8 s of every 10)</string>
+    <string name="status_sent">Sent</string>
+    <string name="status_sent_desc">Position beacons and messages this phone has broadcast</string>
+    <string name="status_received">Received</string>
+    <string name="status_received_desc">Packets heard from your group, first copy only</string>
+    <string name="status_dups">Repeats filtered</string>
+    <string name="status_dups_desc">Extra copies of the same packet (phones repeat and relay). High numbers are normal.</string>
+    <string name="status_relayed">Relayed for others</string>
+    <string name="status_relayed_desc">Packets this phone passed on so friends out of range can hear them</string>
+    <string name="status_gps_row">GPS accuracy</string>
+    <string name="status_gps_desc">Smaller is better. Under 25 m is good; go outside if it stays above 50 m.</string>
+    <string name="status_gps_value">±%1$d m, updated %2$s</string>
+    <string name="status_me">My radio ID</string>
+    <string name="status_me_desc">Shown to friends until your name reaches them</string>
+    <string name="status_close">Close</string>
     <string name="everyone">Everyone</string>
     <string name="back">Back</string>
     <string name="banner_tap_to_reply">Tap to reply</string>

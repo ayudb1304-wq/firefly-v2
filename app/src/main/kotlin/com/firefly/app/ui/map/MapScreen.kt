@@ -219,7 +219,10 @@ fun MapScreen(session: GroupSession) {
                     Text(stringResource(R.string.map_waiting_fix_body), Modifier.padding(24.dp), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            StatusRow(radio = radio, meFixAgeMillis = me?.let { now - it.timeMillis }, accuracy = me?.accuracyMetres)
+            StatusRow(
+                radio = radio, meFixAgeMillis = me?.let { now - it.timeMillis }, accuracy = me?.accuracyMetres,
+                nearby = members.count { now - it.lastSeen <= 60_000L }, myId = SenderId.hex(session.senderId),
+            )
             HorizontalDivider()
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
                 if (members.isEmpty()) {
@@ -243,17 +246,59 @@ fun MapScreen(session: GroupSession) {
 }
 
 @Composable
-private fun StatusRow(radio: RadioStatus, meFixAgeMillis: Long?, accuracy: Float?) {
-    val text = buildString {
-        append(if (radio.degradedReason != null) "⚠ ${radio.degradedReason}" else if (radio.running) "● radio" else "○ radio off")
-        append(if (radio.advertising) " adv" else "")
-        append(if (radio.scanning) " scan" else "")
-        append(" · tx ${radio.packetsSent} rx ${radio.packetsReceived} dup ${radio.packetsDeduped} rly ${radio.packetsRelayed}")
-        if (radio.relaysDropped > 0) append(" (−${radio.relaysDropped})")
-        append(" · gps ")
-        append(if (meFixAgeMillis == null) "—" else "${accuracy?.toInt() ?: "?"} m, ${meFixAgeMillis / 1000}s")
+private fun StatusRow(radio: RadioStatus, meFixAgeMillis: Long?, accuracy: Float?, nearby: Int, myId: String) {
+    var details by remember { mutableStateOf(false) }
+    val problem = radio.degradedReason
+    val headline = when {
+        problem != null -> stringResource(R.string.status_problem, problem)
+        !radio.running -> stringResource(R.string.status_starting)
+        else -> stringResource(R.string.status_ok)
     }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.Start) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = if (radio.degradedReason != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
+    val gps = if (meFixAgeMillis == null) stringResource(R.string.status_gps_none) else stringResource(R.string.status_gps, accuracy?.toInt() ?: 0)
+    val dot = if (problem != null) "⚠" else if (radio.running) "●" else "○"
+    val colour = if (problem != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+    Row(
+        Modifier.fillMaxWidth().clickable { details = true }.padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text("$dot $headline · $gps · ${stringResource(R.string.status_friends, nearby)}", style = MaterialTheme.typography.labelMedium, color = colour, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.status_tap), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+    }
+    if (details) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { details = false },
+            confirmButton = { TextButton(onClick = { details = false }) { Text(stringResource(R.string.status_close)) } },
+            title = { Text(stringResource(R.string.status_details_title)) },
+            text = {
+                Column {
+                    val on = stringResource(R.string.status_on)
+                    val off = stringResource(R.string.status_off)
+                    DetailRow(stringResource(R.string.status_bt_advertising), if (radio.advertising) on else off, null)
+                    DetailRow(stringResource(R.string.status_bt_scanning), if (radio.scanning) on else stringResource(R.string.status_off_pause), null)
+                    DetailRow(stringResource(R.string.status_sent), "${radio.packetsSent}", stringResource(R.string.status_sent_desc))
+                    DetailRow(stringResource(R.string.status_received), "${radio.packetsReceived}", stringResource(R.string.status_received_desc))
+                    DetailRow(stringResource(R.string.status_dups), "${radio.packetsDeduped}", stringResource(R.string.status_dups_desc))
+                    DetailRow(stringResource(R.string.status_relayed), "${radio.packetsRelayed}", stringResource(R.string.status_relayed_desc))
+                    DetailRow(
+                        stringResource(R.string.status_gps_row),
+                        if (meFixAgeMillis == null) stringResource(R.string.status_gps_none) else stringResource(R.string.status_gps_value, accuracy?.toInt() ?: 0, Format.age(System.currentTimeMillis(), System.currentTimeMillis() - meFixAgeMillis)),
+                        stringResource(R.string.status_gps_desc),
+                    )
+                    DetailRow(stringResource(R.string.status_me), myId, stringResource(R.string.status_me_desc))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String, description: String?) {
+    Column(Modifier.padding(vertical = 6.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+        }
+        if (description != null) Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
     }
 }
