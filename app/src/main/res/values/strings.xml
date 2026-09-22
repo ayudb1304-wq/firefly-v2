@@ -117,6 +117,63 @@
     <string name="codebook_minutes_title">How many minutes?</string>
     <string name="codebook_sent">Sent to %1$s: %2$s</string>
     <string name="map_message_fab">Message</string>
+    <string name="map_stats">Stats &amp; export</string>
+    <string name="map_settings">Settings</string>
+
+    <!-- Fix-it and battery cards -->
+    <string name="fix_bluetooth_title">Bluetooth is off</string>
+    <string name="fix_bluetooth_body">Firefly cannot hear or reach your friends without it.</string>
+    <string name="fix_bluetooth_action">Turn on</string>
+    <string name="fix_location_title">Location is off</string>
+    <string name="fix_location_body">Your dot cannot be placed and Android blocks Bluetooth scanning.</string>
+    <string name="fix_location_action">Open settings</string>
+    <string name="battery_card_title">Keep Firefly alive in the background</string>
+    <string name="battery_card_body">%1$s phones stop background apps aggressively. Two settings changes stop that happening to Firefly.</string>
+    <string name="battery_card_action">Show me</string>
+    <string name="battery_card_dismiss">Later</string>
+
+    <!-- Stats -->
+    <string name="stats_title">Stats &amp; export</string>
+    <string name="stats_uptime">Radio running for</string>
+    <string name="stats_sent">Sent</string>
+    <string name="stats_received">Received (unique)</string>
+    <string name="stats_relayed">Relayed for others</string>
+    <string name="stats_dups">Repeats filtered</string>
+    <string name="stats_foreign">Other groups heard</string>
+    <string name="stats_unique">Friends heard in last 5 min</string>
+    <string name="stats_rate">Air load</string>
+    <string name="stats_rate_desc">Firefly packets heard per second, repeats included. Above ~20/s the crowd is congested.</string>
+    <string name="stats_battery">Battery</string>
+    <string name="stats_drain">Drain</string>
+    <string name="stats_drain_wait">measuring… (needs 5 min)</string>
+    <string name="stats_drain_desc">Target ≤ 3 %/h with screen off. Charging invalidates the number.</string>
+    <string name="stats_log_title">Field log</string>
+    <string name="stats_log_rows">%1$d events recorded (keeps the latest 50,000)</string>
+    <string name="stats_log_desc">Every packet heard or sent, with time, signal strength, hops and sender, plus battery samples. Export it as CSV after each test.</string>
+    <string name="stats_export">Export CSV</string>
+    <string name="stats_clear">Clear</string>
+    <string name="stats_cleared">Log cleared</string>
+    <string name="stats_keep_log">Keep log after leaving a group</string>
+    <string name="stats_keep_log_desc">Off by default for privacy: leaving a group wipes it. Turn on for field tests.</string>
+    <string name="stats_footer">Firefly %1$s · %2$s %3$s · Android %4$s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_name_desc">Broadcast to your group. Changes take effect within 30 s.</string>
+    <string name="settings_battery_title">Battery optimisation</string>
+    <string name="settings_battery_body">On %1$s phones the system may stop Firefly when the screen is off. Do this once:</string>
+    <string name="settings_battery_open">Open battery settings</string>
+    <string name="settings_radio_title">Radio (field tests)</string>
+    <string name="settings_radio_desc">Defaults are tuned for a crowd. Change only when running a test, and note the values in the field log.</string>
+    <string name="settings_scan_label">Listening window (on / off)</string>
+    <string name="settings_scan_always">Always on</string>
+    <string name="settings_scan_desc">Longer pauses save battery but can miss messages. Default 8 s / 2 s.</string>
+    <string name="settings_adv_label">Broadcast rate</string>
+    <string name="settings_adv_fast">Fast</string>
+    <string name="settings_adv_balanced">Balanced</string>
+    <string name="settings_adv_saver">Saver</string>
+    <string name="settings_adv_desc">How often the radio repeats your current packet: Fast every 100 ms, Balanced 250 ms (default), Saver 1 s. Fast helps in dense crowds at a battery cost.</string>
+    <string name="settings_radio_note">Changes apply immediately to the running radio and are recorded in the field log so test results can be compared.</string>
 
     <!-- Rendezvous (PRD D1) -->
     <string name="meet_halfway">Meet halfway with %1$s</string>

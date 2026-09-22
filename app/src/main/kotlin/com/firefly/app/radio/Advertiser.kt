@@ -24,6 +24,8 @@ import com.firefly.app.core.protocol.Protocol
 @SuppressLint("MissingPermission")
 class Advertiser(
     private val adapter: BluetoothAdapter,
+    /** AdvertisingSetParameters.INTERVAL_* (units of 0.625 ms). */
+    private val intervalUnits: Int = AdvertisingSetParameters.INTERVAL_MEDIUM,
     private val onStateChanged: (advertising: Boolean, error: String?) -> Unit,
 ) {
     private var advertisingSet: AdvertisingSet? = null
@@ -82,7 +84,7 @@ class Advertiser(
             .setLegacyMode(true)
             .setConnectable(false)
             .setScannable(false)
-            .setInterval(AdvertisingSetParameters.INTERVAL_MEDIUM) // ≈250 ms, "BALANCED"
+            .setInterval(intervalUnits)
             .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_HIGH)
             .build()
         try {
@@ -130,7 +132,13 @@ class Advertiser(
         }
         pendingPayload = null
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+            .setAdvertiseMode(
+                when {
+                    intervalUnits <= AdvertisingSetParameters.INTERVAL_LOW -> AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY
+                    intervalUnits >= AdvertisingSetParameters.INTERVAL_HIGH -> AdvertiseSettings.ADVERTISE_MODE_LOW_POWER
+                    else -> AdvertiseSettings.ADVERTISE_MODE_BALANCED
+                },
+            )
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(false)
             .setTimeout(0)

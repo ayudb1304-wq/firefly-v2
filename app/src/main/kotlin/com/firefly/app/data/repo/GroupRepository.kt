@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 
 /** The one group this install is in (PRD A4: one group at a time). */
@@ -20,6 +21,7 @@ class GroupRepository(
     private val settings: SettingsStore,
     private val members: MemberRepository,
     private val pings: () -> PingRepository,
+    private val fieldLog: () -> FieldLogRepository,
     appScope: CoroutineScope,
 ) {
     val session: Flow<GroupSession?> = combine(settings.groupCode, settings.senderId) { code, id ->
@@ -46,9 +48,11 @@ class GroupRepository(
     }
 
     /** PRD A3: leave and wipe local data for the group. */
+    /** PRD A3 + privacy rule: wipe session data; the field log survives only if the user opted in. */
     suspend fun leave() {
         members.clear()
         pings().clear()
+        if (!settings.keepLog.first()) fieldLog().clear() else fieldLog().event("left group")
         settings.clearGroup()
     }
 }

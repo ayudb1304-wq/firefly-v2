@@ -12,6 +12,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
+import android.bluetooth.le.AdvertisingSetParameters
+import android.location.LocationManager
+import com.firefly.app.data.db.PacketLogEntity
+import com.firefly.app.data.prefs.SettingsStore
+import com.firefly.app.core.util.RateWindow
+import kotlinx.coroutines.flow.combine
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -72,6 +78,9 @@ class FireflyService : Service() {
     private lateinit var alerts: Alerts
     private val dedupe = DedupeCache()
     private val relayQueue = RelayQueue()
+    private val rxRate = RateWindow()
+    private val fieldLog get() = container.fieldLog
+    private var advIntervalUnits = AdvertisingSetParameters.INTERVAL_MEDIUM
     private val inbound = Channel<RawAdvert>(capacity = 256, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     /** Only one thing is on air at a time: own beacon updates wait for bursts to finish. */
@@ -90,7 +99,7 @@ class FireflyService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        battery = BatteryLogger(this)
+        battery = BatteryLogger(this, container.fieldLog)
         alerts = Alerts(this)
         adapter = (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
         ContextCompat.registerReceiver(this, btReceiver, IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -116,15 +125,55 @@ class FireflyService : Service() {
         }
         session = s
         Log.i(TAG, "group=${s.code} groupId=${"%08X".format(s.groupId)} me=${SenderId.hex(s.senderId)}")
-        status.update { it.copy(running = true, degradedReason = null) }
+        status.update { it.copy(running = true, degradedReason = null, startedAtMillis = System.currentTimeMillis()) }
+        fieldLog.event("service start group=${s.code} me=${SenderId.hex(s.senderId)}")
         container.locationSource.start()
         battery.start(scope)
-        startRadio()
+        scope.launch { battery.status.collect { b -> status.update { it.copy(battery = b) } } }
+        scope.launch { settingsLoop() }
         scope.launch { pipeline() }
         scope.launch { beaconLoop() }
         scope.launch { txLoop() }
         scope.launch { relayLoop() }
         scope.launch { nameLoop() }
+        scope.launch { healthLoop() }
+    }
+
+    /** Apply field-test radio settings live; the first emission also starts the radio. */
+    private suspend fun settingsLoop() {
+        val st = container.settings
+        combine(st.scanOnMs, st.scanOffMs, st.advInterval) { on, off, adv -> Triple(on, off, adv) }.collect { (on, off, adv) ->
+            val units = when (adv) {
+                SettingsStore.ADV_LOW_LATENCY -> AdvertisingSetParameters.INTERVAL_LOW
+                SettingsStore.ADV_LOW_POWER -> AdvertisingSetParameters.INTERVAL_HIGH
+                else -> AdvertisingSetParameters.INTERVAL_MEDIUM
+            }
+            val advChanged = units != advIntervalUnits
+            advIntervalUnits = units
+            scanner?.let { it.onMillis = on; it.offMillis = off }
+            if (advChanged && advertiser != null) { advertiser?.stop(); advertiser = null }
+            fieldLog.event("settings scan=${on}/${off}ms adv=$adv")
+            startRadio()
+        }
+    }
+
+    /** Every 10 s: notice Location Services being switched off (GPS dies silently otherwise). */
+    private suspend fun healthLoop() {
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        while (scope.isActive) {
+            val locOn = lm.isLocationEnabled
+            val btOn = adapter?.isEnabled == true
+            status.update {
+                val reason = when {
+                    !btOn -> "Bluetooth is off"
+                    !locOn -> "Location is off"
+                    else -> it.degradedReason?.takeIf { r -> r != "Location is off" && r != "Bluetooth is off" }
+                }
+                if (reason != it.degradedReason) fieldLog.event("degraded=${reason ?: "none"}")
+                it.copy(degradedReason = reason)
+            }
+            delay(10_000)
+        }
     }
 
     private fun startRadio() {
@@ -132,7 +181,7 @@ class FireflyService : Service() {
         if (bt == null || !bt.isEnabled) { degrade("Bluetooth is off"); return }
         status.update { it.copy(degradedReason = null) }
         if (advertiser == null) {
-            advertiser = Advertiser(bt) { on, err -> status.update { it.copy(advertising = on, degradedReason = err ?: it.degradedReason) } }
+            advertiser = Advertiser(bt, advIntervalUnits) { on, err -> status.update { it.copy(advertising = on, degradedReason = err ?: it.degradedReason) } }
         }
         if (scanner == null) {
             scanner = Scanner(bt, onAdvert = { inbound.trySend(it) }) { on, err ->
@@ -179,6 +228,7 @@ class FireflyService : Service() {
                 airtime.withLock {
                     adv.update(req.bytes)
                     status.update { it.copy(packetsSent = it.packetsSent + 1) }
+                    PacketCodec.decode(req.bytes)?.let { fieldLog.packet(PacketLogEntity.TX, it, bytes = req.bytes) }
                     delay(BURST_MS)
                     adv.update(currentBeacon())
                 }
@@ -204,6 +254,7 @@ class FireflyService : Service() {
                 adv.update(currentBeacon())
             }
             status.update { it.copy(packetsRelayed = it.packetsRelayed + 1) }
+            fieldLog.packet(PacketLogEntity.RELAY, entry.packet)
             Log.d(TAG, "RELAY type=${entry.packet.type} from=${SenderId.hex(entry.packet.senderId)} seq=${entry.packet.seq} hops=${entry.packet.hops} ttl=${entry.packet.ttl}")
         }
     }
@@ -236,6 +287,7 @@ class FireflyService : Service() {
             accuracyBucket = AccuracyBucket.fromMetres(fix?.accuracyMetres),
             ts = Packet.tsByte(System.currentTimeMillis()),
         )
+        fieldLog.packet(PacketLogEntity.TX, packet)
         return PacketCodec.encode(packet)
     }
 
@@ -245,18 +297,23 @@ class FireflyService : Service() {
         val s = session ?: return
         for (raw in inbound) {
             val now = System.currentTimeMillis()
+            rxRate.record(now)
             val packet = PacketCodec.decode(raw.bytes)
             if (packet == null) {
+                fieldLog.raw("UNDECODABLE", raw.bytes, raw.rssi, raw.timestampMillis)
                 Log.v(TAG, "RX undecodable ${raw.bytes.toHexSpaced()}"); continue
             }
             if (packet.groupId != s.groupId) {
+                fieldLog.packet(PacketLogEntity.FOREIGN, packet, raw.rssi, ts = raw.timestampMillis)
                 status.update { it.copy(packetsForeign = it.packetsForeign + 1) }; continue
             }
             // Dedupe before anything else (CLAUDE.md non-negotiable).
             if (!dedupe.checkAndInsert(packet.senderId, packet.seq, now)) {
-                status.update { it.copy(packetsDeduped = it.packetsDeduped + 1) }; continue
+                fieldLog.packet(PacketLogEntity.DUP, packet, raw.rssi, ts = raw.timestampMillis)
+                status.update { it.copy(packetsDeduped = it.packetsDeduped + 1, rxPerSecond = rxRate.perSecond(now)) }; continue
             }
-            status.update { it.copy(packetsReceived = it.packetsReceived + 1, lastPacketAtMillis = now) }
+            fieldLog.packet(PacketLogEntity.RX, packet, raw.rssi, raw.bytes, ts = raw.timestampMillis)
+            status.update { it.copy(packetsReceived = it.packetsReceived + 1, lastPacketAtMillis = now, rxPerSecond = rxRate.perSecond(now)) }
             Log.i(
                 TAG,
                 "RX type=${packet.type} code=${packet.code} from=${SenderId.hex(packet.senderId)} seq=${packet.seq} hops=${packet.hops} ttl=${packet.ttl} " +
@@ -339,6 +396,7 @@ class FireflyService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "stopping")
+        fieldLog.event("service stop")
         runCatching { unregisterReceiver(btReceiver) }
         stopRadio()
         relayQueue.clear()

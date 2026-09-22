@@ -21,6 +21,14 @@ class FireflyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // Record crashes in the field log before the default handler kills the process;
+        // the foreground service is START_STICKY so Android restarts it afterwards.
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, e ->
+            runCatching { container.fieldLog.event("CRASH ${thread.name}: ${e::class.java.simpleName}: ${e.message?.take(200)}") }
+            Thread.sleep(300) // give the log writer a moment to flush
+            previous?.uncaughtException(thread, e)
+        }
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { startedActivities++; inForeground = true }
             override fun onActivityStopped(activity: Activity) { startedActivities--; inForeground = startedActivities > 0 }

@@ -14,16 +14,19 @@
 - Same APK build on all phones; note build hash.
 - Battery % at start and end; screen-on time.
 - Device list with OEM/OS version.
-- Export CSV from every phone at the end; name `test<step>_<phone>_<date>.csv`.
+- Export CSV from every phone at the end: ⋮ → *Stats & export* → *Export CSV* (share to yourself). Files are named `firefly_<group>_<radioId>_<device>_<date>.csv`; put them in a folder named `test<step>_<date>/`. Turn on *Keep log after leaving a group* before the test or leaving the group wipes it.
 - Scripted scenarios (step 3+): (a) "Where are you" ping at 30 m, 60 m, 120 m; (b) MEET_AT and time to physical reunion; (c) SOS from a corner of the crowd.
 
+## Reading the CSV
+One row per event. `event` is `TX` (we put it on air), `RX` (first copy heard), `DUP` (repeat copy, dropped), `RELAY` (we re-broadcast it), `FOREIGN` (another group), `BATTERY` (level sample each minute) or `EVENT` (service start/stop, settings, degraded state, crash). `sender`/`target` are radio IDs in hex; `code` is the codebook code (0 = beacon); `rssi` is dBm on RX/DUP; `bytes` is the raw 24-byte packet on TX/RX.
+
 ## Metrics computed from CSVs
-- Delivery rate = pings ACKed / pings sent.
-- Latency = ACK ts − send ts.
-- Hop distribution.
-- Duplicate ratio = deduped / received (should stay < 3× at density).
-- Packets/sec per node (congestion indicator).
-- Drain %/hour.
+- Delivery rate = distinct (sender, seq) of `TX` rows with type 1 that have a matching `RX` row of type 3 (ACK) with `arg` = seq & 0xFF, divided by distinct `TX` pings.
+- Latency = ts of that ACK `RX` − ts of the first `TX` of the ping.
+- Hop distribution = histogram of `hops` over `RX` rows.
+- Duplicate ratio = `DUP` rows / `RX` rows. Note each phone advertises a beacon continuously for its whole interval, so 3–8× is normal even for two phones; watch for growth with crowd size, not the absolute value.
+- Packets/sec per node = (`RX` + `DUP` + `FOREIGN`) rows per second (the *Air load* number on the Stats screen).
+- Drain %/hour = from `BATTERY` rows: (first level − last level) / hours, excluding periods where `charging=true`.
 
 ## Codebook coverage (step 4)
 Hand out a paper slip: "what did you actually want to say?" Count messages not expressible in the 12 codes. Target ≤ 10%.

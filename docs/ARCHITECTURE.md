@@ -82,8 +82,8 @@ With no venue pack, `FreeMap` (pure) decides the free map's width (zoom to fit t
 ### data/ (Room)
 - `members(senderId PK, name, lat, lon, accuracy, lastSeen, hops, rssi)`
 - `pings(id PK, seq, senderId, target, code, arg, direction, status, ts)`
-- `packet_log(id PK, ts, rssi, type, senderId, seq, hops, ttl, target, bytesHex)` — field-test only, capped at 50k rows, ring-buffered.
-- `DataStore`: groupCode, senderId, displayName, keepLog, scanDuty, advIntervals.
+- `packet_log(id PK, ts, event, type, senderId, seq, hops, ttl, target, code, arg, rssi, latE6, lonE6, bytesHex, extra)` — every radio event (`RX`, `DUP`, `FOREIGN`, `TX`, `RELAY`, `BATTERY`, `EVENT`), capped at 50k rows, ring-buffered, written in batches off the radio thread. Exported as CSV via the share sheet.
+- `DataStore`: groupCode, senderId, displayName, joinedAt, keepLog, scanOnMs/scanOffMs, advInterval, batteryCardDismissed.
 
 ## 5. Key decisions & trade-offs
 | Decision | Why | Trade-off |

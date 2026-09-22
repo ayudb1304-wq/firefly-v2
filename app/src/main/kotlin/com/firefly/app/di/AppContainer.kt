@@ -6,6 +6,7 @@ import com.firefly.app.data.db.FireflyDatabase
 import com.firefly.app.data.db.PingEntity
 import com.firefly.app.data.prefs.SettingsStore
 import com.firefly.app.data.prefs.settingsDataStore
+import com.firefly.app.data.repo.FieldLogRepository
 import com.firefly.app.data.repo.GroupRepository
 import com.firefly.app.data.repo.MemberRepository
 import com.firefly.app.data.repo.PingRepository
@@ -42,7 +43,7 @@ class AppContainer(private val appContext: Context) {
 
     val memberRepository: MemberRepository by lazy { MemberRepository(database.memberDao()) }
 
-    val groupRepository: GroupRepository by lazy { GroupRepository(settings, memberRepository, { pingRepository }, appScope) }
+    val groupRepository: GroupRepository by lazy { GroupRepository(settings, memberRepository, { pingRepository }, { fieldLog }, appScope) }
 
     val locationSource: LocationSource by lazy { LocationSource(appContext) }
 
@@ -64,4 +65,6 @@ class AppContainer(private val appContext: Context) {
     fun publishIncoming(ping: PingEntity) { _incomingPings.tryEmit(ping) }
 
     val venueRepository: VenueRepository by lazy { VenueRepository(appContext) }
+
+    val fieldLog: FieldLogRepository by lazy { FieldLogRepository(appContext, database.packetLogDao(), appScope) }
 }

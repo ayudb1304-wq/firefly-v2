@@ -71,6 +71,12 @@ import com.firefly.app.ui.codebook.Recipient
 import com.firefly.app.ui.common.Format
 import com.firefly.app.ui.timeline.TimelineScreen
 import com.firefly.app.ui.lighthouse.LighthouseScreen
+import com.firefly.app.ui.stats.StatsScreen
+import com.firefly.app.ui.settings.SettingsScreen
+import com.firefly.app.ui.common.OemBattery
+import android.bluetooth.BluetoothAdapter
+import android.content.Intent
+import android.provider.Settings
 import com.firefly.app.core.protocol.Codebook
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material3.Button
@@ -118,6 +124,10 @@ fun MapScreen(session: GroupSession) {
     val lighthouses by vm.lighthouses.collectAsStateWithLifecycle()
     var meetPlan by remember { mutableStateOf<MapViewModel.MeetPlan?>(null) }
     var showLighthouse by remember { mutableStateOf(false) }
+    var showStats by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    val batteryCardDismissed by app.container.settings.batteryCardDismissed.collectAsStateWithLifecycle(initialValue = true)
+    val oem = remember { OemBattery.advice(context) }
     DisposableEffect(Unit) { vm.startCompass(); onDispose { vm.stopCompass() } }
     var banner by remember { mutableStateOf<PingEntity?>(null) }
     val sosActive by vm.sosActive.collectAsStateWithLifecycle()
@@ -196,6 +206,8 @@ fun MapScreen(session: GroupSession) {
     }
     var showQr by remember { mutableStateOf(false) }
     if (showQr) com.firefly.app.ui.qr.GroupQrDialog(code = session.code, onDismiss = { showQr = false })
+    if (showStats) { StatsScreen(onBack = { showStats = false }); return }
+    if (showSettings) { SettingsScreen(onBack = { showSettings = false }); return }
     if (showTimeline) {
         TimelineScreen(
             pings = pings, names = names, pois = venue?.pois.orEmpty(), nowMillis = now,
@@ -248,6 +260,8 @@ fun MapScreen(session: GroupSession) {
                                     onClick = { menuOpen = false; vm.removeVenue() },
                                 )
                             }
+                            DropdownMenuItem(text = { Text(stringResource(R.string.map_stats)) }, onClick = { menuOpen = false; showStats = true })
+                            DropdownMenuItem(text = { Text(stringResource(R.string.map_settings)) }, onClick = { menuOpen = false; showSettings = true })
                             Divider()
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.map_leave), color = MaterialTheme.colorScheme.error) },
@@ -260,6 +274,27 @@ fun MapScreen(session: GroupSession) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            // Fix-it card (ARCHITECTURE.md §6 Degraded state)
+            when (radio.degradedReason) {
+                "Bluetooth is off" -> FixCard(stringResource(R.string.fix_bluetooth_title), stringResource(R.string.fix_bluetooth_body), stringResource(R.string.fix_bluetooth_action)) {
+                    runCatching { context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
+                }
+                "Location is off" -> FixCard(stringResource(R.string.fix_location_title), stringResource(R.string.fix_location_body), stringResource(R.string.fix_location_action)) {
+                    runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
+                }
+            }
+            if (!batteryCardDismissed) {
+                Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text(stringResource(R.string.battery_card_title), style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.battery_card_body, oem.maker), style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { showSettings = true }) { Text(stringResource(R.string.battery_card_action)) }
+                            TextButton(onClick = { uiScope.launch { app.container.settings.setBatteryCardDismissed(true) } }) { Text(stringResource(R.string.battery_card_dismiss)) }
+                        }
+                    }
+                }
+            }
             if (sosActive) {
                 Card(
                     Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -443,5 +478,18 @@ private fun DetailRow(label: String, value: String, description: String?) {
             Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
         }
         if (description != null) Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+    }
+}
+
+@Composable
+private fun FixCard(title: String, body: String, action: String, onAction: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onErrorContainer)
+                Text(body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+            Button(onClick = onAction) { Text(action) }
+        }
     }
 }

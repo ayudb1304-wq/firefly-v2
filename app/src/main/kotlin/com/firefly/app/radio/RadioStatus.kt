@@ -14,4 +14,8 @@ data class RadioStatus(
     val packetsRelayed: Int = 0,
     val relaysDropped: Int = 0,
     val lastPacketAtMillis: Long? = null,
+    /** Received packets per second over the last minute (dups included: it measures air load). */
+    val rxPerSecond: Double = 0.0,
+    val startedAtMillis: Long? = null,
+    val battery: BatteryStatus? = null,
 )

@@ -38,7 +38,7 @@ private val DarkColors = darkColorScheme(
     background = Night, onBackground = Paper,
     surface = NightSurface, onSurface = Paper,
     surfaceVariant = NightSurfaceHigh, onSurfaceVariant = Color(0xFFC9C2B4),
-    surfaceContainer = NightSurfaceHigh, surfaceContainerHigh = Color(0xFF2B3240), surfaceContainerLow = Color(0xFF12161D),
+    surfaceContainer = NightSurfaceHigh, surfaceContainerHigh = Color(0xFF2B3240), surfaceContainerHighest = Color(0xFF333B4A), surfaceContainerLow = Color(0xFF12161D),
     outline = Color(0xFF6B6455), outlineVariant = Color(0xFF3A3F4A),
 )
 
@@ -54,7 +54,7 @@ private val LightColors = lightColorScheme(
     background = Cream, onBackground = Ink,
     surface = Color.White, onSurface = Ink,
     surfaceVariant = CreamSurface, onSurfaceVariant = Color(0xFF52493A),
-    surfaceContainer = CreamSurface, surfaceContainerHigh = Color(0xFFEFE6D2), surfaceContainerLow = Cream,
+    surfaceContainer = CreamSurface, surfaceContainerHigh = Color(0xFFEFE6D2), surfaceContainerHighest = Color(0xFFE8DEC6), surfaceContainerLow = Cream,
     outline = Color(0xFF847A66), outlineVariant = Color(0xFFD8CFBC),
 )
 
