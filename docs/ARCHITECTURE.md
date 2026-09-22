@@ -13,8 +13,8 @@ A single Android app, no server. Goals in priority order: (1) works with zero co
                │                              │
 ┌──────────────┴──────────┐      ┌────────────┴─────────────┐
 │ data/                   │      │ venue/                   │
-│ Room: members, pings,   │      │ VenuePack loader,        │
-│ packet_log · repos      │      │ MapProjection (geo→px)   │
+│ Room: members, pings,   │      │ VenueRepository (zip     │
+│ packet_log · repos      │      │ import, optional pack)   │
 └──────────────▲──────────┘      └──────────────────────────┘
                │
 ┌──────────────┴─────────────────────────────────────────────┐
@@ -63,8 +63,8 @@ Pure function: `(packet, myPos, targetLastPos?, senderPos, now) → Relay | Drop
 ### core/DedupeCache
 LRU keyed by `(senderId shl 16) or seq`, 512 entries, 5-minute TTL. Pure Kotlin.
 
-### venue/MapProjection
-`venue.json` gives the lat/lon of the image's four corners. Compute an affine transform (assume small area, no rotation correction needed beyond the affine fit). `toPixel(lat, lon)` and `toGeo(px, py)`.
+### core/geo/MapProjection and FreeMap
+With no venue pack, `FreeMap` (pure) decides the free map's width (zoom to fit the group, with hysteresis), when to recentre on me, and the grid spacing; the projection is `MapProjection.centredOn(me, width)`. With a pack, `venue.json` gives the lat/lon of the image's four corners. Compute an affine transform (assume small area, no rotation correction needed beyond the affine fit). `toPixel(lat, lon)` and `toGeo(px, py)`.
 
 ```json
 {
@@ -91,7 +91,7 @@ LRU keyed by `(senderId shl 16) or seq`, 512 entries, 5-minute TTL. Pure Kotlin.
 | Advertising only, no GATT | Connections fail at density; broadcast scales | 24-byte payload cap; no free text |
 | Legacy adverts, not extended | Works on every API 26+ phone incl. cheap ones | Can't grow payload without BLE 5 gating |
 | Geo-routed relay | Cuts rebroadcast volume vs. flooding | Needs recent target position; falls back to flood |
-| Static image map | No internet dependency, fast | Per-venue setup work |
+| Free grid map by default, venue image optional | Works at any crowd with zero setup; no internet | Free map has no landmarks; POIs need a pack |
 | Foreground service | Only way to scan reliably | Persistent notification; OEM battery-killer risk |
 | No encryption in v0 | Ship faster, measure first | Positions readable by anyone with the app and group ID; documented on onboarding; v1.1 fixes |
 | Codebook not chat | Fits in a packet; faster in a crowd | Expressiveness limited; validate coverage in tests |

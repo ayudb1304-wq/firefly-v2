@@ -6,9 +6,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
@@ -17,62 +20,70 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.firefly.app.core.geo.MapProjection
+import com.firefly.app.core.geo.FreeMap
 import com.firefly.app.core.group.SenderId
 import com.firefly.app.core.protocol.AccuracyBucket
 import com.firefly.app.data.db.MemberEntity
 import com.firefly.app.location.Fix
 import com.firefly.app.ui.common.Format
-import com.firefly.app.venue.VenuePack
+import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 private val MeColor = Color(0xFF4FC3F7)
+private val MapBackground = Color(0xFF161B23)
+private val GridMinor = Color(0xFF272E3A)
+private val GridMajor = Color(0xFF3A4453)
+private val OnMap = Color(0xFFECE6DA)
 private const val STALE_AFTER_MS = 60_000L
 
-/** Static venue image with POIs, group members and me (PRD B2). Fit-to-box, no pan/zoom in Phase 1. */
+/**
+ * The map: a venue image when one is loaded and I am on it, otherwise a
+ * north-up metric grid centred near me (PRD B2). Fit-to-box, no pan/zoom yet.
+ */
 @Composable
 fun VenueMap(
-    venue: VenuePack,
-    projection: MapProjection,
+    frame: MapFrame,
     me: Fix?,
     members: List<MemberEntity>,
     nowMillis: Long,
     modifier: Modifier = Modifier,
 ) {
-    val image = remember(venue) { venue.image.asImageBitmap() }
+    val image = remember(frame.venue) { frame.venue?.image?.asImageBitmap() }
     val measurer = rememberTextMeasurer()
     val scheme = MaterialTheme.colorScheme
-    // The venue image is always dark, so map labels ignore the app theme.
-    val onMap = Color(0xFFECE6DA)
-    val labelStyle = TextStyle(fontSize = 11.sp, color = onMap, fontWeight = FontWeight.Medium)
-    val poiStyle = TextStyle(fontSize = 10.sp, color = onMap.copy(alpha = 0.75f))
+    val labelStyle = TextStyle(fontSize = 11.sp, color = OnMap, fontWeight = FontWeight.Medium)
+    val poiStyle = TextStyle(fontSize = 10.sp, color = OnMap.copy(alpha = 0.75f))
+    val hudStyle = TextStyle(fontSize = 10.sp, color = OnMap.copy(alpha = 0.8f))
+    val projection = frame.projection
 
     Canvas(modifier) {
-        val scale = min(size.width / image.width, size.height / image.height)
-        val drawnW = image.width * scale
-        val drawnH = image.height * scale
+        val scale = min(size.width / projection.imageWidth, size.height / projection.imageHeight)
+        val drawnW = projection.imageWidth * scale
+        val drawnH = projection.imageHeight * scale
         val origin = Offset((size.width - drawnW) / 2f, (size.height - drawnH) / 2f)
-        drawImage(
-            image = image,
-            dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()),
-            dstSize = IntSize(drawnW.roundToInt(), drawnH.roundToInt()),
-        )
         val pxPerMetre = (projection.pixelsPerMetre() * scale).toFloat()
+
+        if (image != null) {
+            drawImage(image, dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()), dstSize = IntSize(drawnW.roundToInt(), drawnH.roundToInt()))
+        } else {
+            drawRect(MapBackground, topLeft = origin, size = Size(drawnW, drawnH))
+            drawGrid(origin, drawnW, drawnH, pxPerMetre, measurer, hudStyle)
+        }
+        drawRect(Color(0xFF8A6100), topLeft = origin, size = Size(drawnW, drawnH), style = Stroke(1.dp.toPx()))
+
         fun at(lat: Double, lon: Double): Offset {
             val p = projection.toPixel(lat, lon)
             return Offset(origin.x + (p.x * scale).toFloat(), origin.y + (p.y * scale).toFloat())
         }
 
-        // POIs
-        venue.pois.forEach { poi ->
+        frame.venue?.pois?.forEach { poi ->
             if (!projection.contains(poi.lat, poi.lon)) return@forEach
             val o = at(poi.lat, poi.lon)
-            drawCircle(onMap.copy(alpha = 0.6f), radius = 3.dp.toPx(), center = o)
+            drawCircle(OnMap.copy(alpha = 0.6f), radius = 3.dp.toPx(), center = o)
             drawText(measurer, poi.name, topLeft = o + Offset(5.dp.toPx(), -7.dp.toPx()), style = poiStyle)
         }
 
-        // Members
         members.forEach { m ->
             val lat = m.lat ?: return@forEach
             val lon = m.lon ?: return@forEach
@@ -88,13 +99,49 @@ fun VenueMap(
             drawText(measurer, label, topLeft = o + Offset(10.dp.toPx(), -8.dp.toPx()), style = labelStyle)
         }
 
-        // Me
         me?.let { f ->
+            if (!projection.contains(f.lat, f.lon)) return@let
             val o = at(f.lat, f.lon)
             val ring = (f.accuracyMetres ?: 0f) * pxPerMetre
             if (ring > 0f) drawCircle(MeColor.copy(alpha = 0.15f), radius = ring, center = o)
             drawCircle(Color.White, radius = 9.dp.toPx(), center = o)
             drawCircle(MeColor, radius = 7.dp.toPx(), center = o)
         }
+
+        // North arrow (both modes are north-up).
+        val n = origin + Offset(drawnW - 16.dp.toPx(), 18.dp.toPx())
+        drawLine(OnMap, n + Offset(0f, 8.dp.toPx()), n + Offset(0f, -8.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawLine(OnMap, n + Offset(-4.dp.toPx(), -3.dp.toPx()), n + Offset(0f, -8.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawLine(OnMap, n + Offset(4.dp.toPx(), -3.dp.toPx()), n + Offset(0f, -8.dp.toPx()), strokeWidth = 2.dp.toPx())
+        drawText(measurer, "N", topLeft = n + Offset(-4.dp.toPx(), 9.dp.toPx()), style = hudStyle)
     }
+}
+
+/** Metric grid plus a scale bar, so distances are readable without a venue image. */
+private fun DrawScope.drawGrid(origin: Offset, w: Float, h: Float, pxPerMetre: Float, measurer: TextMeasurer, style: TextStyle) {
+    if (pxPerMetre <= 0f) return
+    val stepM = FreeMap.gridSpacingMetres(pxPerMetre.toDouble(), 56.dp.toPx().toDouble())
+    val stepPx = (stepM * pxPerMetre).toFloat()
+    val cx = origin.x + w / 2
+    val cy = origin.y + h / 2
+    val nx = ceil(w / 2 / stepPx).toInt()
+    val ny = ceil(h / 2 / stepPx).toInt()
+    for (i in -nx..nx) {
+        val x = cx + i * stepPx
+        if (x < origin.x || x > origin.x + w) continue
+        drawLine(if (i % 5 == 0) GridMajor else GridMinor, Offset(x, origin.y), Offset(x, origin.y + h), strokeWidth = 1f)
+    }
+    for (j in -ny..ny) {
+        val y = cy + j * stepPx
+        if (y < origin.y || y > origin.y + h) continue
+        drawLine(if (j % 5 == 0) GridMajor else GridMinor, Offset(origin.x, y), Offset(origin.x + w, y), strokeWidth = 1f)
+    }
+    // Scale bar, bottom-left.
+    val barY = origin.y + h - 14.dp.toPx()
+    val barX = origin.x + 12.dp.toPx()
+    drawLine(OnMap, Offset(barX, barY), Offset(barX + stepPx, barY), strokeWidth = 2.dp.toPx())
+    drawLine(OnMap, Offset(barX, barY - 4.dp.toPx()), Offset(barX, barY + 4.dp.toPx()), strokeWidth = 2.dp.toPx())
+    drawLine(OnMap, Offset(barX + stepPx, barY - 4.dp.toPx()), Offset(barX + stepPx, barY + 4.dp.toPx()), strokeWidth = 2.dp.toPx())
+    val label = if (stepM >= 1000) "${(stepM / 1000).toInt()} km" else "${stepM.toInt()} m"
+    drawText(measurer, label, topLeft = Offset(barX, barY - 18.dp.toPx()), style = style)
 }

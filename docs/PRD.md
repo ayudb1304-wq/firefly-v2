@@ -81,7 +81,9 @@
 **G3. Stats screen.** Live counters: packets sent/received/relayed/deduped, unique senders heard, battery % and drain rate.
 
 ### Epic H — Venue
-**H1. Venue pack.** A folder with `map.png` and `venue.json` (name, corner coordinates, POIs). Bundled in the APK for v1; loadable from a file in v1.1.
+**H1. No venue required.** With no venue pack the map is a north-up metric grid centred on me that auto-zooms to keep the group in view, with a scale bar. Firefly must be fully usable at any crowd this way.
+
+**H2. Venue pack (optional).** A zip with `map.png` and `venue.json` (name, corner coordinates, POIs), made by an organiser and loaded by the user from the map screen. See `docs/VENUE_PACK.md`. Nothing venue-specific is bundled in the APK.
 
 ## 4. Non-functional requirements
 | Area | Requirement |

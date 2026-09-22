@@ -1,6 +1,6 @@
 # CLAUDE.md — Firefly
 
-Firefly is an **offline, phone-to-phone "find and meet" app for large crowds** (music festivals, stadiums, religious gatherings). It works with **no cellular data, no Wi-Fi, no server**. Phones broadcast tiny Bluetooth Low Energy (BLE) advertisement packets carrying their GPS position and a short coded message; every other phone running Firefly relays them. Target pilot: Lollapalooza India 2027.
+Firefly is an **offline, phone-to-phone "find and meet" app for large crowds** (music festivals, stadiums, religious gatherings). It works with **no cellular data, no Wi-Fi, no server**. Phones broadcast tiny Bluetooth Low Energy (BLE) advertisement packets carrying their GPS position and a short coded message; every other phone running Firefly relays them. It is venue-agnostic: it works anywhere with no setup (free grid map), and an organiser can optionally supply a venue pack for a real site map. First pilot target: Lollapalooza India 2027, but nothing may be hard-coded to one event.
 
 Read these before writing any code, in this order:
 1. `docs/BRD.md` — why this exists and what "done" means for the business
@@ -16,7 +16,7 @@ Read these before writing any code, in this order:
 - Coroutines + Flow for async. Room for local storage. DataStore for prefs.
 - Android BLE APIs directly (`BluetoothLeAdvertiser`, `BluetoothLeScanner`). **No third-party BLE or mesh libraries.**
 - `FusedLocationProviderClient` for GPS.
-- Static venue map (PNG + JSON calibration). **No Google Maps / Mapbox** — they need internet.
+- Maps: free north-up metric grid by default; optional static venue pack (PNG + JSON calibration, loaded from a zip, never bundled). **No Google Maps / Mapbox** — they need internet.
 - Manual dependency injection via a single `AppContainer`. No Hilt/Dagger/Koin in v1.
 - Gradle Kotlin DSL, version catalog (`gradle/libs.versions.toml`).
 - Tests: JUnit5 + kotlinx-coroutines-test for unit tests; Compose UI tests only for critical screens.
@@ -29,7 +29,7 @@ com.firefly.app
 ├── radio/       # BLE advertise/scan, foreground service, duty cycling
 ├── location/    # GPS wrapper
 ├── data/        # Room entities, DAOs, repositories
-├── venue/       # venue config loading, map projection
+├── venue/       # optional venue pack import/storage
 ├── ui/          # Compose screens + view models
 └── di/          # AppContainer
 ```
@@ -56,7 +56,7 @@ com.firefly.app
 - **Beacon** — a position-only packet, sent periodically.
 - **Ping** — a coded message packet (from the codebook).
 - **Group** — friends sharing a 6-character join code. All packets are tagged with the group's ID.
-- **POI** — a named point on the venue map (Stage A, Bar 2, Toilets North). Codebook messages reference POIs by index.
+- **POI** — a named point on a venue pack's map (Stage A, Bar 2, Toilets North). Codebook messages reference POIs by index; without a venue pack, "meet here" style messages use the sender's position instead.
 - **Rendezvous** — the app-suggested POI nearest the midpoint between two friends.
 - **Lighthouse** — screen-flash mode for the last 30 metres.
 - **Totem** — an optional fixed ESP32 relay node placed by the organiser (Phase 6, not v1).

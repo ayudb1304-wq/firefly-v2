@@ -15,7 +15,7 @@ Work strictly in order. Each phase ends when its exit criteria pass on real devi
 - `FireflyService` with `Advertiser` (own BEACON) and `Scanner` (parse, log to Logcat).
 - `LocationSource` with Fused provider, movement classifier.
 - Permissions onboarding.
-- Home: create/join group (typed code only). Map screen: venue image + my dot + one dot per heard member.
+- Home: create/join group (typed code only). Map screen: free grid map (or venue image if a pack is loaded) + my dot + one dot per heard member.
 **Exit:** Phone A and B in the same group see each other's dots update within 30 s at 20 m apart in the open. Battery drain logged.
 
 ## Phase 2 — Codebook & timeline (3–4 days)
@@ -54,7 +54,7 @@ Work strictly in order. Each phase ends when its exit criteria pass on real devi
 
 ## Phase 7 — Launch hardening (5–7 days)
 - Play Store listing, privacy policy, permission justification video.
-- Venue pack for Lolla (surveyed corners, POIs).
+- Venue pack for the pilot event (surveyed corners, POIs), distributed as a zip — the app itself stays venue-agnostic.
 - Onboarding copy, accessibility pass, dark mode.
 - Encryption of content fields (v1.1) if time permits.
 **Exit:** submitted to Play Store ≥ 4 weeks before the event.
@@ -63,5 +63,5 @@ Work strictly in order. Each phase ends when its exit criteria pass on real devi
 - iOS app (Swift, CoreBluetooth).
 - Camera-based lighthouse detection.
 - Anonymised density heatmap.
-- Multi-group, loadable venue packs from file/QR.
+- Multi-group; venue pack delivery by QR.
 - BLE 5 extended advertising path.

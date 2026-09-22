@@ -2,7 +2,7 @@
 
 Offline friend-finding for large crowds. No signal needed.
 
-Phones broadcast a 24-byte BLE advertisement with their GPS position and a short coded message. Every Firefly phone nearby relays it. A static venue map shows where your group is; the app suggests a meeting point; a screen-flash "lighthouse" gets you the last 30 metres.
+Phones broadcast a 24-byte BLE advertisement with their GPS position and a short coded message. Every Firefly phone nearby relays it. A map shows where your group is (a free grid anywhere, or an organiser's venue map if you load one); the app suggests a meeting point; a screen-flash "lighthouse" gets you the last 30 metres.
 
 **Status:** Phase 1 built (beacons, scanner, map); awaiting the two-phone field test — see `docs/ROADMAP.md`. Target pilot: Lollapalooza India 2027.
 
@@ -35,6 +35,7 @@ Requires two physical Android phones (API 26+) with Bluetooth and GPS for anythi
 | `docs/TESTING.md` | Field test plan |
 | `docs/DECISIONS.md` | Decision log |
 | `docs/FIELD_LOG.md` | Results of every real-device test |
+| `docs/VENUE_PACK.md` | Optional venue pack format for organisers |
 | `docs/KICKOFF_PROMPT.md` | First prompt to paste into Claude Code |
 
 ## Contributing

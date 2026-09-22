@@ -9,8 +9,7 @@ import com.firefly.app.data.repo.GroupRepository
 import com.firefly.app.data.repo.MemberRepository
 import com.firefly.app.location.LocationSource
 import com.firefly.app.radio.RadioStatusHolder
-import com.firefly.app.venue.VenueLoader
-import com.firefly.app.venue.VenuePack
+import com.firefly.app.venue.VenueRepository
 
 /**
  * Manual dependency container. One instance per process, owned by [com.firefly.app.FireflyApp].
@@ -35,5 +34,5 @@ class AppContainer(private val appContext: Context) {
 
     val radioStatus: RadioStatusHolder = RadioStatusHolder()
 
-    val venue: VenuePack by lazy { VenueLoader.load(appContext) }
+    val venueRepository: VenueRepository by lazy { VenueRepository(appContext) }
 }
