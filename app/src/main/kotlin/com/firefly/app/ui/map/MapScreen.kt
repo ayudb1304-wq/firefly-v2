@@ -72,6 +72,9 @@ import com.firefly.app.ui.common.Format
 import com.firefly.app.ui.timeline.TimelineScreen
 import com.firefly.app.data.db.PingEntity
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.FloatingActionButtonDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +93,7 @@ fun MapScreen(session: GroupSession) {
         while (true) { delay(1_000); value = System.currentTimeMillis() }
     }
     val snackbar = remember { SnackbarHostState() }
+    val uiScope = rememberCoroutineScope()
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.consumeMessage() } }
 
     val pickVenue = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::importVenue) }
@@ -116,7 +120,16 @@ fun MapScreen(session: GroupSession) {
             recipients = recipients,
             initialRecipient = r,
             pois = venue?.pois.orEmpty(),
-            onSend = { code, arg, target -> vm.send(code, arg, target); sheetFor = null },
+            onSend = { code, arg, target ->
+                vm.send(code, arg, target)
+                sheetFor = null
+                if (code != com.firefly.app.core.protocol.Codebook.HELP) {
+                    val to = recipients.firstOrNull { it.senderId == target }?.label ?: SenderId.hex(target)
+                    val poiName = venue?.pois?.firstOrNull { it.index == arg }?.name
+                    val text = context.getString(R.string.codebook_sent, to, PingText.describe(context, code, arg, poiName))
+                    uiScope.launch { snackbar.showSnackbar(text) }
+                }
+            },
             onDismiss = { sheetFor = null },
         )
     }
@@ -150,8 +163,11 @@ fun MapScreen(session: GroupSession) {
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { sheetFor = recipients.first() },
-                icon = { Icon(Icons.Default.Send, contentDescription = null) },
-                text = { Text(stringResource(R.string.map_send)) },
+                icon = { Icon(painterResource(R.drawable.ic_messages), contentDescription = null) },
+                text = { Text(stringResource(R.string.map_message_fab), fontWeight = FontWeight.Bold) },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp),
             )
         },
         topBar = {

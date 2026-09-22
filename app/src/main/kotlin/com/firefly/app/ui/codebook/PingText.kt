@@ -22,6 +22,23 @@ object PingText {
         else -> R.string.code_unknown
     }
 
+    /** A visual anchor per message so the grid can be scanned without reading. */
+    fun glyph(code: Int): String = when (code) {
+        Codebook.WHERE_ARE_YOU -> "❓"
+        Codebook.MEET_AT -> "🤝"
+        Codebook.ON_MY_WAY -> "🏃"
+        Codebook.STAY_THERE -> "✋"
+        Codebook.GOING_TO -> "➡️"
+        Codebook.BACK_IN_MINUTES -> "⏱"
+        Codebook.HELP -> "🆘"
+        Codebook.LIGHTHOUSE_ON -> "🔦"
+        Codebook.ACK -> "👍"
+        Codebook.LOW_BATTERY -> "🔋"
+        Codebook.CALL_ME -> "📞"
+        Codebook.LEAVING_VENUE -> "🚪"
+        else -> "💬"
+    }
+
     /** Full sentence including the argument, e.g. "Meet at Bar 2", "Back in 10 min". */
     fun describe(context: Context, code: Int, arg: Int, poiName: String?): String {
         val label = context.getString(labelRes(code))

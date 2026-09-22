@@ -92,23 +92,31 @@
 
     <!-- Codebook (PRD C3) -->
     <string name="code_where_are_you">Where are you?</string>
-    <string name="code_meet_at">Meet at…</string>
+    <string name="code_meet_at">Meet at</string>
     <string name="code_on_my_way">On my way</string>
-    <string name="code_stay_there">Stay where you are</string>
-    <string name="code_going_to">Going to…</string>
-    <string name="code_back_in">Back in…</string>
+    <string name="code_stay_there">Stay there</string>
+    <string name="code_going_to">Going to</string>
+    <string name="code_back_in">Back in</string>
     <string name="code_help">HELP / SOS</string>
     <string name="code_lighthouse">Lighthouse on</string>
     <string name="code_ack">OK</string>
     <string name="code_low_battery">Low battery</string>
-    <string name="code_call_me">Call me if you can</string>
+    <string name="code_call_me">Call me</string>
     <string name="code_leaving">Leaving venue</string>
     <string name="code_unknown">Message</string>
     <string name="arg_here_fmt">%1$s my position</string>
     <string name="arg_poi_fmt">%1$s %2$s</string>
     <string name="arg_poi_number">point %1$d</string>
     <string name="arg_minutes_fmt">%1$s %2$d min</string>
+    <string name="codebook_title">Send a message</string>
     <string name="codebook_to">To</string>
+    <string name="codebook_section_find">Find each other</string>
+    <string name="codebook_section_plans">Plans</string>
+    <string name="codebook_section_other">Other</string>
+    <string name="codebook_section_emergency">Emergency</string>
+    <string name="codebook_minutes_title">How many minutes?</string>
+    <string name="codebook_sent">Sent to %1$s: %2$s</string>
+    <string name="map_message_fab">Message</string>
     <string name="codebook_back">‹ Back</string>
     <string name="codebook_here">Here (my position)</string>
     <string name="codebook_here_hint">Sends where you are right now</string>
