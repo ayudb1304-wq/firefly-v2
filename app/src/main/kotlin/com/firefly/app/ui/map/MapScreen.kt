@@ -70,6 +70,10 @@ import com.firefly.app.ui.codebook.PingText
 import com.firefly.app.ui.codebook.Recipient
 import com.firefly.app.ui.common.Format
 import com.firefly.app.ui.timeline.TimelineScreen
+import com.firefly.app.ui.lighthouse.LighthouseScreen
+import com.firefly.app.core.protocol.Codebook
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.material3.Button
 import com.firefly.app.data.db.PingEntity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -109,6 +113,12 @@ fun MapScreen(session: GroupSession) {
     var showTimeline by remember { mutableStateOf(false) }
     var confirmLeave by remember { mutableStateOf(false) }
     val unread by vm.unread.collectAsStateWithLifecycle()
+    val heading by vm.heading.collectAsStateWithLifecycle()
+    val meetPins by vm.meetPins.collectAsStateWithLifecycle()
+    val lighthouses by vm.lighthouses.collectAsStateWithLifecycle()
+    var meetPlan by remember { mutableStateOf<MapViewModel.MeetPlan?>(null) }
+    var showLighthouse by remember { mutableStateOf(false) }
+    DisposableEffect(Unit) { vm.startCompass(); onDispose { vm.stopCompass() } }
     var banner by remember { mutableStateOf<PingEntity?>(null) }
     val sosActive by vm.sosActive.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.incoming.collect { banner = it } }
@@ -120,7 +130,9 @@ fun MapScreen(session: GroupSession) {
             recipients = recipients,
             initialRecipient = r,
             pois = venue?.pois.orEmpty(),
+            onMeetHalfway = { r -> sheetFor = null; meetPlan = vm.planMeeting(r.senderId) },
             onSend = { code, arg, target ->
+                if (code == Codebook.LIGHTHOUSE_ON) { sheetFor = null; showLighthouse = true; vm.startLighthouse(); return@CodebookSheet }
                 vm.send(code, arg, target)
                 sheetFor = null
                 if (code != com.firefly.app.core.protocol.Codebook.HELP) {
@@ -134,6 +146,41 @@ fun MapScreen(session: GroupSession) {
         )
     }
     BackHandler(enabled = showTimeline) { showTimeline = false }
+    if (showLighthouse) LighthouseScreen(senderId = session.senderId, onClose = { showLighthouse = false })
+    meetPlan?.let { plan ->
+        AlertDialog(
+            onDismissRequest = { meetPlan = null },
+            title = { Text(stringResource(R.string.meet_title, when (plan) { is MapViewModel.MeetPlan.Ready -> names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId); is MapViewModel.MeetPlan.NoTheirPosition -> names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId); else -> "" })) },
+            text = {
+                when (plan) {
+                    is MapViewModel.MeetPlan.Ready -> Column {
+                        val s = plan.suggestion
+                        val poi = s.poi
+                        Text(if (poi != null) stringResource(R.string.meet_at_poi, poi.name) else stringResource(R.string.meet_at_point), style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.meet_distances, Format.distance(s.distanceFromMeMetres), Format.distance(s.distanceFromThemMetres)), style = MaterialTheme.typography.bodyMedium)
+                        if (s.theirPositionStale) {
+                            Text(stringResource(R.string.meet_stale_warning, names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId)), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                        }
+                    }
+                    is MapViewModel.MeetPlan.NoTheirPosition -> Text(stringResource(R.string.meet_no_position, names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId)))
+                    MapViewModel.MeetPlan.NoMyPosition -> Text(stringResource(R.string.meet_no_my_position))
+                }
+            },
+            confirmButton = {
+                if (plan is MapViewModel.MeetPlan.Ready) {
+                    Button(onClick = {
+                        vm.propose(plan); meetPlan = null
+                        val who = names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId)
+                        val where = plan.suggestion.poi?.name ?: context.getString(R.string.codebook_here)
+                        uiScope.launch { snackbar.showSnackbar(context.getString(R.string.codebook_sent, who, context.getString(R.string.code_meet_at) + " " + where)) }
+                    }) { Text(stringResource(R.string.meet_send)) }
+                } else {
+                    TextButton(onClick = { meetPlan = null }) { Text(stringResource(R.string.status_close)) }
+                }
+            },
+            dismissButton = { if (plan is MapViewModel.MeetPlan.Ready) TextButton(onClick = { meetPlan = null }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
     if (confirmLeave) {
         AlertDialog(
             onDismissRequest = { confirmLeave = false },
@@ -246,7 +293,14 @@ fun MapScreen(session: GroupSession) {
                             } else {
                                 Text(from, style = MaterialTheme.typography.labelMedium)
                                 Text(PingText.describe(context, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
-                                Text(stringResource(R.string.banner_tap_to_reply), style = MaterialTheme.typography.labelSmall)
+                                if (b.code == Codebook.MEET_AT) {
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                                        Button(onClick = { vm.accept(b); banner = null; uiScope.launch { snackbar.showSnackbar(context.getString(R.string.codebook_sent, from, context.getString(R.string.code_on_my_way))) } }) { Text(stringResource(R.string.meet_accept)) }
+                                        TextButton(onClick = { banner = null; sheetFor = Recipient(b.senderId, from) }) { Text(stringResource(R.string.meet_counter)) }
+                                    }
+                                } else {
+                                    Text(stringResource(R.string.banner_tap_to_reply), style = MaterialTheme.typography.labelSmall)
+                                }
                             }
                         }
                         if (isSos) TextButton(onClick = { banner = null }) { Text(stringResource(R.string.banner_dismiss)) }
@@ -261,15 +315,26 @@ fun MapScreen(session: GroupSession) {
             }
             Box(Modifier.fillMaxWidth().heightIn(min = 240.dp).weight(1f).background(Color(0xFF161B23)), contentAlignment = Alignment.Center) {
                 if (!frame.waitingForFix) {
-                    VenueMap(frame = frame, me = me, members = members, nowMillis = now, modifier = Modifier.fillMaxSize())
+                    VenueMap(frame = frame, me = me, members = members, nowMillis = now, modifier = Modifier.fillMaxSize(), pins = meetPins, headingDegrees = heading?.degrees)
                 } else {
                     Text(stringResource(R.string.map_waiting_fix_body), Modifier.padding(24.dp), style = MaterialTheme.typography.bodyMedium, color = Color(0xFFECE6DA))
                 }
-                Text(
-                    caption,
-                    Modifier.align(Alignment.TopStart).padding(8.dp).background(Color(0x99161B23), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
-                    style = MaterialTheme.typography.labelSmall, color = Color(0xFFECE6DA),
-                )
+                Column(Modifier.align(Alignment.TopStart).padding(8.dp)) {
+                    Text(
+                        caption,
+                        Modifier.background(Color(0x99161B23), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall, color = Color(0xFFECE6DA),
+                    )
+                    heading?.let { h ->
+                        if (h.unreliable) {
+                            Text(
+                                stringResource(R.string.compass_hint),
+                                Modifier.padding(top = 4.dp).background(Color(0xCC5C1B1B), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall, color = Color(0xFFFFDAD6),
+                            )
+                        }
+                    }
+                }
             }
             StatusRow(
                 radio = radio, meFixAgeMillis = me?.let { now - it.timeMillis }, accuracy = me?.accuracyMetres,
@@ -301,15 +366,16 @@ fun MapScreen(session: GroupSession) {
                         headlineContent = { Text(label, fontWeight = FontWeight.SemiBold) },
                         supportingContent = {
                             Text(
-                                listOf(
+                                listOfNotNull(
                                     Format.age(now, m.lastSeen),
                                     if (m.hops > 0) stringResource(R.string.member_hops, m.hops) else stringResource(R.string.member_direct),
+                                    lighthouses[m.senderId]?.let { "🔦 " + stringResource(R.string.lighthouse_member, it) },
                                 ).joinToString(" · "),
                             )
                         },
                         trailingContent = {
                             Text(
-                                if (dist != null) "${Format.distance(dist)} ${Format.bearingArrow(bearing)}" else stringResource(R.string.member_no_position),
+                                if (dist != null) "${Format.distance(dist)} ${Format.directionArrow(bearing, heading?.degrees)}" else stringResource(R.string.member_no_position),
                                 style = if (dist != null) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelSmall,
                                 color = if (fresh) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             )

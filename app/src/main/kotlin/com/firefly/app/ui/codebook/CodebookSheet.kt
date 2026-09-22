@@ -77,6 +77,7 @@ fun CodebookSheet(
     pois: List<Poi>,
     onSend: (code: Int, arg: Int, target: Int) -> Unit,
     onDismiss: () -> Unit,
+    onMeetHalfway: ((Recipient) -> Unit)? = null,
 ) {
     var recipient by remember { mutableStateOf(initialRecipient) }
     var pendingCode by remember { mutableStateOf<Int?>(null) }
@@ -120,6 +121,24 @@ fun CodebookSheet(
 
             val code = pendingCode
             if (code == null) {
+                if (onMeetHalfway != null && recipient.senderId != Protocol.TARGET_BROADCAST) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth().height(64.dp).clickable { onMeetHalfway(recipient) },
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("🤝", style = MaterialTheme.typography.headlineSmall)
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(stringResource(R.string.meet_halfway, recipient.label), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.meet_halfway_hint), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
                 sections.forEach { section ->
                     SectionTitle(stringResource(section.titleRes))
                     section.codes.chunked(2).forEach { pair ->

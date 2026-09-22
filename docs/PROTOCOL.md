@@ -32,7 +32,7 @@ This is the contract between all Firefly nodes (Android, later iOS and ESP32 tot
 | Type | Name | Notes |
 |---|---|---|
 | 0x0 | BEACON | position only; `code` must be 0x00 |
-| 0x1 | PING | codebook message; carries sender position too |
+| 0x1 | PING | codebook message; carries sender position too. **Exception:** for `MEET_AT` (0x02) and `GOING_TO` (0x05) with `arg` = 0, `lat`/`lon` carry the *proposed point* (the sender's position or a computed midpoint). Receivers must not update the sender's position from such a packet. |
 | 0x2 | NAME | bytes 10–17 reinterpreted as 8 ASCII chars display name; lat/lon absent |
 | 0x3 | ACK | `arg` = low byte of acknowledged seq, `target` = original sender |
 | 0x4–0xE | reserved | |

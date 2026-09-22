@@ -18,6 +18,10 @@ object Format {
         else -> "%.1f km".format(metres / 1000)
     }
 
+    /** Arrow relative to where the phone points when a heading is known, else relative to north. */
+    fun directionArrow(bearing: Double?, headingDegrees: Float?): String =
+        if (bearing == null) "" else bearingArrow(if (headingDegrees == null) bearing else ((bearing - headingDegrees) % 360 + 360) % 360)
+
     fun bearingArrow(degrees: Double?): String {
         if (degrees == null) return ""
         val arrows = arrayOf("↑", "↗", "→", "↘", "↓", "↙", "←", "↖")

@@ -18,6 +18,25 @@ object GeoMath {
         return 2 * EARTH_RADIUS_M * atan2(sqrt(a), sqrt(1 - a))
     }
 
+    /** Geographic midpoint of two points (spherical; exact enough at venue scale). */
+    fun midpoint(lat1: Double, lon1: Double, lat2: Double, lon2: Double): LatLon {
+        val p1 = Math.toRadians(lat1); val l1 = Math.toRadians(lon1)
+        val p2 = Math.toRadians(lat2); val l2 = Math.toRadians(lon2)
+        val bx = cos(p2) * cos(l2 - l1)
+        val by = cos(p2) * sin(l2 - l1)
+        val lat = atan2(sin(p1) + sin(p2), sqrt((cos(p1) + bx) * (cos(p1) + bx) + by * by))
+        val lon = l1 + atan2(by, cos(p1) + bx)
+        return LatLon(Math.toDegrees(lat), ((Math.toDegrees(lon) + 540) % 360) - 180)
+    }
+
+    /** Signed smallest difference a − b in degrees, in (−180, 180]. */
+    fun angleDelta(a: Double, b: Double): Double {
+        var d = (a - b) % 360.0
+        if (d > 180) d -= 360
+        if (d <= -180) d += 360
+        return d
+    }
+
     /** Initial bearing from point 1 to point 2, degrees clockwise from north in [0, 360). */
     fun bearingDegrees(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val p1 = Math.toRadians(lat1)

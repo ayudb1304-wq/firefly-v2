@@ -9,6 +9,7 @@ import com.firefly.app.data.prefs.settingsDataStore
 import com.firefly.app.data.repo.GroupRepository
 import com.firefly.app.data.repo.MemberRepository
 import com.firefly.app.data.repo.PingRepository
+import com.firefly.app.location.HeadingSource
 import com.firefly.app.location.LocationSource
 import com.firefly.app.radio.RadioStatusHolder
 import com.firefly.app.radio.SeqCounter
@@ -44,6 +45,8 @@ class AppContainer(private val appContext: Context) {
     val groupRepository: GroupRepository by lazy { GroupRepository(settings, memberRepository, { pingRepository }, appScope) }
 
     val locationSource: LocationSource by lazy { LocationSource(appContext) }
+
+    val headingSource: HeadingSource by lazy { HeadingSource(appContext, locationSource.fixes) }
 
     val radioStatus: RadioStatusHolder = RadioStatusHolder()
 

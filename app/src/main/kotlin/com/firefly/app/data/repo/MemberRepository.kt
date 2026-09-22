@@ -1,7 +1,9 @@
 package com.firefly.app.data.repo
 
 import com.firefly.app.core.geo.LatLon
+import com.firefly.app.core.protocol.Codebook
 import com.firefly.app.core.protocol.Packet
+import com.firefly.app.core.protocol.Protocol
 import com.firefly.app.core.routing.RelayPolicy
 import com.firefly.app.data.db.MemberDao
 import com.firefly.app.data.db.MemberEntity
@@ -14,7 +16,7 @@ class MemberRepository(private val dao: MemberDao) {
 
     suspend fun onPacket(packet: Packet, rssi: Int, nowMillis: Long) {
         val existing = dao.get(packet.senderId)
-        val hasPos = packet.hasPosition
+        val hasPos = packet.hasPosition && !(packet.type == Protocol.Type.PING && Codebook.carriesProposedPoint(packet.code, packet.arg))
         dao.upsert(
             MemberEntity(
                 senderId = packet.senderId,

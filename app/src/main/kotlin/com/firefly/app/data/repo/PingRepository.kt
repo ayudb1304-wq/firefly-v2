@@ -1,6 +1,7 @@
 package com.firefly.app.data.repo
 
 import android.util.Log
+import com.firefly.app.core.geo.LatLon
 import com.firefly.app.core.messaging.AckMatcher
 import com.firefly.app.core.protocol.AccuracyBucket
 import com.firefly.app.core.protocol.Codebook
@@ -58,13 +59,17 @@ class PingRepository(
         _sosActive.value = false
     }
 
-    /** Send a codebook message. Returns the stored row, or null if not in a group or the arg is invalid. */
-    suspend fun send(code: Int, arg: Int, target: Int): PingEntity? {
+    /**
+     * Send a codebook message. Returns the stored row, or null if not in a group or the arg is invalid.
+     * @param point for MEET_AT/GOING_TO with arg 0: the proposed place to carry instead of my position.
+     */
+    suspend fun send(code: Int, arg: Int, target: Int, point: LatLon? = null): PingEntity? {
         val s = session() ?: return null
         val entry = Codebook.entry(code) ?: return null
         if (!Codebook.isValidArg(code, arg)) return null
         val now = System.currentTimeMillis()
         val f = fix()
+        val carried: LatLon? = if (Codebook.carriesProposedPoint(code, arg)) point ?: f?.let { LatLon(it.lat, it.lon) } else f?.let { LatLon(it.lat, it.lon) }
         val packet = Packet(
             type = Protocol.Type.PING,
             groupId = s.groupId,
@@ -72,8 +77,8 @@ class PingRepository(
             seq = seq.next(),
             ttl = Codebook.ttl(code),
             hops = 0,
-            latE6 = f?.let { Packet.toE6(it.lat) } ?: 0,
-            lonE6 = f?.let { Packet.toE6(it.lon) } ?: 0,
+            latE6 = carried?.let { Packet.toE6(it.lat) } ?: 0,
+            lonE6 = carried?.let { Packet.toE6(it.lon) } ?: 0,
             priority = entry.priority,
             ackRequested = entry.wantsAck,
             accuracyBucket = AccuracyBucket.fromMetres(f?.accuracyMetres),
@@ -84,7 +89,7 @@ class PingRepository(
         )
         val row = PingEntity(
             seq = packet.seq, senderId = s.senderId, target = target, code = code, arg = arg,
-            lat = f?.lat, lon = f?.lon, direction = PingEntity.OUT, status = PingEntity.SENT, ts = now,
+            lat = carried?.lat, lon = carried?.lon, direction = PingEntity.OUT, status = PingEntity.SENT, ts = now,
         )
         val id = dao.insert(row)
         tx.enqueue(TxRequest(PacketCodec.encode(packet), Codebook.repeats(code), Codebook.spacingMillis(code), entry.priority, "PING $code"))

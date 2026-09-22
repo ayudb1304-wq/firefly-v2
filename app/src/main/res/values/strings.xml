@@ -117,6 +117,30 @@
     <string name="codebook_minutes_title">How many minutes?</string>
     <string name="codebook_sent">Sent to %1$s: %2$s</string>
     <string name="map_message_fab">Message</string>
+
+    <!-- Rendezvous (PRD D1) -->
+    <string name="meet_halfway">Meet halfway with %1$s</string>
+    <string name="meet_halfway_hint">Firefly picks the spot between you</string>
+    <string name="meet_title">Meet %1$s</string>
+    <string name="meet_at_poi">Suggested: %1$s</string>
+    <string name="meet_at_point">Suggested: the point halfway between you</string>
+    <string name="meet_distances">%1$s for you · %2$s for them</string>
+    <string name="meet_stale_warning">%1$s\'s position is over 10 minutes old — they may have moved.</string>
+    <string name="meet_no_position">Cannot suggest a place yet: %1$s\'s position is unknown. Send "Where are you?" first.</string>
+    <string name="meet_no_my_position">Waiting for your GPS position before suggesting a place.</string>
+    <string name="meet_send">Send proposal</string>
+    <string name="meet_accept">On my way</string>
+    <string name="meet_counter">Somewhere else</string>
+    <string name="pin_meet_with">Meet %1$s</string>
+    <string name="pin_meet_here">Meeting point</string>
+
+    <!-- Compass -->
+    <string name="compass_hint">Compass unreliable — move your phone in a figure of 8</string>
+    <string name="compass_relative">Arrows point relative to where you face</string>
+
+    <!-- Lighthouse (PRD E1) -->
+    <string name="lighthouse_hint">Your pattern: %1$s · %2$d s left · tap to stop</string>
+    <string name="lighthouse_member">flashing %1$s</string>
     <string name="codebook_back">‹ Back</string>
     <string name="codebook_here">Here (my position)</string>
     <string name="codebook_here_hint">Sends where you are right now</string>

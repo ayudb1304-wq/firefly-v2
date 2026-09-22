@@ -12,6 +12,11 @@ import com.firefly.app.data.db.MemberEntity
 import com.firefly.app.data.db.PingEntity
 import com.firefly.app.di.AppContainer
 import com.firefly.app.location.Fix
+import com.firefly.app.location.Heading
+import com.firefly.app.core.messaging.LighthousePattern
+import com.firefly.app.core.messaging.Rendezvous
+import com.firefly.app.core.protocol.Codebook
+import com.firefly.app.core.protocol.Protocol
 import com.firefly.app.radio.RadioStatus
 import com.firefly.app.venue.VenuePack
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -115,6 +120,63 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
         onDone()
     }
 
+    // ---- Phase 4: compass, meeting points, lighthouse ----
+
+    val heading: StateFlow<Heading?> = container.headingSource.heading
+    fun startCompass() = container.headingSource.start()
+    fun stopCompass() = container.headingSource.stop()
+
+    /** Meeting points from MEET_AT pings in the last 30 minutes, newest per counterpart. */
+    val meetPins: StateFlow<List<MapPin>> = combine(pings, venue, names) { list, venue, names ->
+        val cutoff = System.currentTimeMillis() - MEET_PIN_TTL_MS
+        list.asSequence()
+            .filter { it.code == Codebook.MEET_AT && it.ts >= cutoff }
+            .distinctBy { if (it.direction == PingEntity.IN) it.senderId else it.target }
+            .mapNotNull { p ->
+                val point = if (p.arg == Codebook.POI_HERE) {
+                    if (p.lat != null && p.lon != null) LatLon(p.lat, p.lon) else null
+                } else venue?.pois?.firstOrNull { it.index == p.arg }?.let { LatLon(it.lat, it.lon) }
+                point?.let {
+                    val other = if (p.direction == PingEntity.IN) p.senderId else p.target
+                    val who = if (other == Protocol.TARGET_BROADCAST) null else names[other] ?: SenderId.hex(other)
+                    val place = venue?.pois?.firstOrNull { poi -> poi.index == p.arg && p.arg != Codebook.POI_HERE }?.name
+                    MapPin(it.lat, it.lon, listOfNotNull(place ?: "Meet", who).joinToString(" · "))
+                }
+            }.toList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** senderId → pattern label for members whose LIGHTHOUSE_ON is less than 2 minutes old. */
+    val lighthouses: StateFlow<Map<Int, String>> = pings.map { list ->
+        val cutoff = System.currentTimeMillis() - LighthousePattern.AUTO_OFF_MS
+        list.filter { it.direction == PingEntity.IN && it.code == Codebook.LIGHTHOUSE_ON && it.ts >= cutoff }
+            .associate { it.senderId to LighthousePattern.label(LighthousePattern.forSender(it.senderId)) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    sealed interface MeetPlan {
+        data class Ready(val member: MemberEntity, val suggestion: Rendezvous.Suggestion) : MeetPlan
+        data class NoTheirPosition(val member: MemberEntity) : MeetPlan
+        data object NoMyPosition : MeetPlan
+    }
+
+    fun planMeeting(memberId: Int): MeetPlan? {
+        val m = members.value.firstOrNull { it.senderId == memberId } ?: return null
+        val me = myFix.value ?: return MeetPlan.NoMyPosition
+        val lat = m.lat ?: return MeetPlan.NoTheirPosition(m)
+        val lon = m.lon ?: return MeetPlan.NoTheirPosition(m)
+        val places = venue.value?.pois.orEmpty().map { Rendezvous.Place(it.index, it.name, LatLon(it.lat, it.lon)) }
+        return MeetPlan.Ready(m, Rendezvous.suggest(LatLon(me.lat, me.lon), LatLon(lat, lon), m.lastSeen, places, System.currentTimeMillis()))
+    }
+
+    fun propose(plan: MeetPlan.Ready) = viewModelScope.launch {
+        val s = plan.suggestion
+        container.pingRepository.send(Codebook.MEET_AT, s.poi?.index ?: Codebook.POI_HERE, plan.member.senderId, if (s.poi == null) s.point else null)
+    }
+
+    /** Accept a MEET_AT: the automatic ACK already went out; add the human answer. */
+    fun accept(ping: PingEntity) = send(Codebook.ON_MY_WAY, 0, ping.senderId)
+
+    fun startLighthouse() = send(Codebook.LIGHTHOUSE_ON, 0, Protocol.TARGET_BROADCAST)
+
     /** Unread = incoming pings newer than the last time the timeline was opened. */
     private val _timelineOpenedAt = MutableStateFlow(0L)
     val unread: StateFlow<Int> = combine(pings, _timelineOpenedAt) { list, since ->
@@ -122,4 +184,8 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
     fun markTimelineSeen() { _timelineOpenedAt.value = System.currentTimeMillis() }
+
+    private companion object {
+        const val MEET_PIN_TTL_MS = 30 * 60_000L
+    }
 }

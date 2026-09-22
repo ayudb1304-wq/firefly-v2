@@ -28,6 +28,9 @@ import com.firefly.app.data.db.MemberEntity
 import com.firefly.app.location.Fix
 import com.firefly.app.ui.common.Format
 import kotlin.math.ceil
+import kotlin.math.cos
+import kotlin.math.sin
+import androidx.compose.ui.graphics.Path
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -37,6 +40,9 @@ private val GridMinor = Color(0xFF272E3A)
 private val GridMajor = Color(0xFF3A4453)
 private val OnMap = Color(0xFFECE6DA)
 private const val STALE_AFTER_MS = 60_000L
+
+/** A marker drawn on the map (meeting points). */
+data class MapPin(val lat: Double, val lon: Double, val label: String)
 
 /**
  * The map: a venue image when one is loaded and I am on it, otherwise a
@@ -49,6 +55,8 @@ fun VenueMap(
     members: List<MemberEntity>,
     nowMillis: Long,
     modifier: Modifier = Modifier,
+    pins: List<MapPin> = emptyList(),
+    headingDegrees: Float? = null,
 ) {
     val image = remember(frame.venue) { frame.venue?.image?.asImageBitmap() }
     val measurer = rememberTextMeasurer()
@@ -104,11 +112,38 @@ fun VenueMap(
             drawText(measurer, label, topLeft = o + Offset(10.dp.toPx(), -8.dp.toPx()), style = labelStyle)
         }
 
+        // Meeting points
+        pins.forEach { pin ->
+            if (!projection.contains(pin.lat, pin.lon)) return@forEach
+            val o = at(pin.lat, pin.lon)
+            val flag = Path().apply {
+                moveTo(o.x, o.y); lineTo(o.x, o.y - 22.dp.toPx()); lineTo(o.x + 14.dp.toPx(), o.y - 17.dp.toPx()); lineTo(o.x, o.y - 12.dp.toPx()); close()
+            }
+            drawCircle(Color(0xFFFF6F00).copy(alpha = 0.25f), radius = 12.dp.toPx(), center = o)
+            drawPath(flag, Color(0xFFFF6F00))
+            drawLine(Color(0xFFFF6F00), o, o + Offset(0f, -22.dp.toPx()), strokeWidth = 2.dp.toPx())
+            drawText(measurer, pin.label, topLeft = o + Offset(16.dp.toPx(), -30.dp.toPx()), style = labelStyle)
+        }
+
         me?.let { f ->
             if (!projection.contains(f.lat, f.lon)) return@let
             val o = at(f.lat, f.lon)
             val ring = (f.accuracyMetres ?: 0f) * pxPerMetre
             if (ring > 0f) drawCircle(MeColor.copy(alpha = 0.15f), radius = ring, center = o)
+            headingDegrees?.let { h ->
+                // Facing cone: 50° wide, pointing where the top of the phone points (map is north-up).
+                val r = 34.dp.toPx()
+                val a = Math.toRadians(h.toDouble() - 90)
+                val cone = Path().apply {
+                    moveTo(o.x, o.y)
+                    for (i in -25..25 step 5) {
+                        val t = a + Math.toRadians(i.toDouble())
+                        lineTo(o.x + (r * cos(t)).toFloat(), o.y + (r * sin(t)).toFloat())
+                    }
+                    close()
+                }
+                drawPath(cone, MeColor.copy(alpha = 0.35f))
+            }
             drawCircle(Color.White, radius = 9.dp.toPx(), center = o)
             drawCircle(MeColor, radius = 7.dp.toPx(), center = o)
         }

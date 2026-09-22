@@ -30,8 +30,15 @@ object Codebook {
         ACK_SEQ,
     }
 
-    /** `arg` value for POI-kind messages meaning "at my current position". */
+    /**
+     * `arg` value for POI-kind messages meaning "at the point carried in this packet's
+     * lat/lon bytes" — the sender's own position, or a proposed midpoint (PROTOCOL.md §3 note).
+     */
     const val POI_HERE = 0
+
+    /** True when a PING's lat/lon bytes describe a proposed place rather than the sender's position. */
+    fun carriesProposedPoint(code: Int, arg: Int): Boolean =
+        (code == MEET_AT || code == GOING_TO) && arg == POI_HERE
 
     data class Entry(
         val code: Int,
