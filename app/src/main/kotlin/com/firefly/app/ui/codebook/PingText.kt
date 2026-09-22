@@ -1,6 +1,7 @@
 package com.firefly.app.ui.codebook
 
 import android.content.Context
+import android.content.res.Resources
 import com.firefly.app.R
 import com.firefly.app.core.protocol.Codebook
 
@@ -40,12 +41,14 @@ object PingText {
     }
 
     /** Full sentence including the argument, e.g. "Meet at Bar 2", "Back in 10 min". */
-    fun describe(context: Context, code: Int, arg: Int, poiName: String?): String {
-        val label = context.getString(labelRes(code))
+    fun describe(context: Context, code: Int, arg: Int, poiName: String?): String = describe(context.resources, code, arg, poiName)
+
+    fun describe(res: Resources, code: Int, arg: Int, poiName: String?): String {
+        val label = res.getString(labelRes(code))
         return when (Codebook.entry(code)?.arg) {
-            Codebook.ArgKind.POI -> if (arg == Codebook.POI_HERE) context.getString(R.string.arg_here_fmt, label)
-            else context.getString(R.string.arg_poi_fmt, label, poiName ?: context.getString(R.string.arg_poi_number, arg))
-            Codebook.ArgKind.MINUTES -> context.getString(R.string.arg_minutes_fmt, label, arg)
+            Codebook.ArgKind.POI -> if (arg == Codebook.POI_HERE) res.getString(R.string.arg_here_fmt, label)
+            else res.getString(R.string.arg_poi_fmt, label, poiName ?: res.getString(R.string.arg_poi_number, arg))
+            Codebook.ArgKind.MINUTES -> res.getString(R.string.arg_minutes_fmt, label, arg)
             else -> label
         }
     }

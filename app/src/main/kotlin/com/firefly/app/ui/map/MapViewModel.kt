@@ -44,7 +44,7 @@ data class MapFrame(
     val waitingForFix: Boolean,
 )
 
-class MapViewModel(private val container: AppContainer) : ViewModel() {
+class MapViewModel(private val container: AppContainer, private val res: android.content.res.Resources) : ViewModel() {
 
     val members: StateFlow<List<MemberEntity>> =
         container.memberRepository.members.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -71,7 +71,7 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
 
     fun send(code: Int, arg: Int, target: Int) = viewModelScope.launch {
         if (code == com.firefly.app.core.protocol.Codebook.HELP) { container.pingRepository.startSos(); return@launch }
-        if (container.pingRepository.send(code, arg, target) == null) _message.value = "Could not send"
+        if (container.pingRepository.send(code, arg, target) == null) _message.value = res.getString(com.firefly.app.R.string.msg_could_not_send)
     }
 
     val sosActive: StateFlow<Boolean> = container.pingRepository.sosActive
@@ -104,13 +104,13 @@ class MapViewModel(private val container: AppContainer) : ViewModel() {
 
     fun importVenue(uri: Uri) = viewModelScope.launch {
         container.venueRepository.importZip(uri)
-            .onSuccess { _message.value = "Loaded venue: ${it.name}" }
-            .onFailure { _message.value = "Could not load venue pack: ${it.message ?: "invalid file"}" }
+            .onSuccess { _message.value = res.getString(com.firefly.app.R.string.msg_venue_loaded, it.name) }
+            .onFailure { _message.value = res.getString(com.firefly.app.R.string.msg_venue_failed, it.message ?: res.getString(com.firefly.app.R.string.msg_venue_invalid)) }
     }
 
     fun removeVenue() {
         container.venueRepository.remove()
-        _message.value = "Venue pack removed"
+        _message.value = res.getString(com.firefly.app.R.string.msg_venue_removed)
     }
 
     fun consumeMessage() { _message.value = null }

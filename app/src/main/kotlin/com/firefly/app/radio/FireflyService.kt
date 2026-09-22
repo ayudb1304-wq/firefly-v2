@@ -161,7 +161,8 @@ class FireflyService : Service() {
     private suspend fun healthLoop() {
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         while (scope.isActive) {
-            val locOn = lm.isLocationEnabled
+            val locOn = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) lm.isLocationEnabled
+                else lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
             val btOn = adapter?.isEnabled == true
             status.update {
                 val reason = when {
@@ -223,7 +224,9 @@ class FireflyService : Service() {
                 q.normal.onReceive { it }
             }
             for (i in 0 until req.repeats) {
-                val adv = advertiser
+                var adv = advertiser
+                var waited = 0L
+                while (adv == null && waited < RADIO_WAIT_MS) { delay(200); waited += 200; adv = advertiser }
                 if (adv == null) { Log.w(TAG, "radio down, dropping ${req.label}"); break }
                 airtime.withLock {
                     adv.update(req.bytes)
@@ -422,6 +425,8 @@ class FireflyService : Service() {
         /** PROTOCOL.md §5 step 7: one burst per relayed packet. */
         const val RELAY_BURST_MS = 500L
         const val RELAY_IDLE_POLL_MS = 100L
+        /** How long a queued packet waits for the radio to come up before being dropped. */
+        const val RADIO_WAIT_MS = 5_000L
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, FireflyService::class.java))

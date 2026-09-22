@@ -118,6 +118,11 @@
     <string name="codebook_sent">Sent to %1$s: %2$s</string>
     <string name="map_message_fab">Message</string>
     <string name="map_stats">Stats &amp; export</string>
+    <string name="msg_could_not_send">Could not send</string>
+    <string name="msg_venue_loaded">Loaded venue: %1$s</string>
+    <string name="msg_venue_failed">Could not load venue pack: %1$s</string>
+    <string name="msg_venue_invalid">invalid file</string>
+    <string name="msg_venue_removed">Venue pack removed</string>
     <string name="map_settings">Settings</string>
 
     <!-- Fix-it and battery cards -->

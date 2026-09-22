@@ -17,7 +17,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.firefly.app.R
@@ -39,7 +39,7 @@ fun TimelineScreen(
     onReply: (senderId: Int) -> Unit,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
+    val res = LocalResources.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -64,7 +64,7 @@ fun TimelineScreen(
                 }
                 ListItem(
                     overlineContent = { Text(if (incoming) stringResource(R.string.timeline_from, otherName) else stringResource(R.string.timeline_to, otherName)) },
-                    headlineContent = { Text(PingText.describe(context, p.code, p.arg, poiName)) },
+                    headlineContent = { Text(PingText.describe(res, p.code, p.arg, poiName)) },
                     supportingContent = { Text(listOf(Format.age(nowMillis, p.ts), status).filter { it.isNotEmpty() }.joinToString(" · ")) },
                     leadingContent = { Text(if (incoming) "↓" else "↑", style = MaterialTheme.typography.titleLarge) },
                     modifier = if (incoming) Modifier.clickable { onReply(p.senderId) } else Modifier,

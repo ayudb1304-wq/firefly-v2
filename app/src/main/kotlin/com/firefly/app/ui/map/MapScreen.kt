@@ -54,6 +54,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,8 +91,9 @@ import androidx.compose.material3.FloatingActionButtonDefaults
 @Composable
 fun MapScreen(session: GroupSession) {
     val context = LocalContext.current
+    val res = LocalResources.current
     val app = context.applicationContext as FireflyApp
-    val vm: MapViewModel = viewModel { MapViewModel(app.container) }
+    val vm: MapViewModel = viewModel { MapViewModel(app.container, app.resources) }
     val members by vm.members.collectAsStateWithLifecycle()
     val me by vm.myFix.collectAsStateWithLifecycle()
     val radio by vm.radio.collectAsStateWithLifecycle()
@@ -148,7 +150,7 @@ fun MapScreen(session: GroupSession) {
                 if (code != com.firefly.app.core.protocol.Codebook.HELP) {
                     val to = recipients.firstOrNull { it.senderId == target }?.label ?: SenderId.hex(target)
                     val poiName = venue?.pois?.firstOrNull { it.index == arg }?.name
-                    val text = context.getString(R.string.codebook_sent, to, PingText.describe(context, code, arg, poiName))
+                    val text = res.getString(R.string.codebook_sent, to, PingText.describe(res, code, arg, poiName))
                     uiScope.launch { snackbar.showSnackbar(text) }
                 }
             },
@@ -181,8 +183,8 @@ fun MapScreen(session: GroupSession) {
                     Button(onClick = {
                         vm.propose(plan); meetPlan = null
                         val who = names[plan.member.senderId] ?: SenderId.hex(plan.member.senderId)
-                        val where = plan.suggestion.poi?.name ?: context.getString(R.string.codebook_here)
-                        uiScope.launch { snackbar.showSnackbar(context.getString(R.string.codebook_sent, who, context.getString(R.string.code_meet_at) + " " + where)) }
+                        val where = plan.suggestion.poi?.name ?: res.getString(R.string.codebook_here)
+                        uiScope.launch { snackbar.showSnackbar(res.getString(R.string.codebook_sent, who, res.getString(R.string.code_meet_at) + " " + where)) }
                     }) { Text(stringResource(R.string.meet_send)) }
                 } else {
                     TextButton(onClick = { meetPlan = null }) { Text(stringResource(R.string.status_close)) }
@@ -277,7 +279,9 @@ fun MapScreen(session: GroupSession) {
             // Fix-it card (ARCHITECTURE.md §6 Degraded state)
             when (radio.degradedReason) {
                 "Bluetooth is off" -> FixCard(stringResource(R.string.fix_bluetooth_title), stringResource(R.string.fix_bluetooth_body), stringResource(R.string.fix_bluetooth_action)) {
-                    runCatching { context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
+                    val canAsk = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.S ||
+                        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (canAsk) runCatching { context.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)) }
                 }
                 "Location is off" -> FixCard(stringResource(R.string.fix_location_title), stringResource(R.string.fix_location_body), stringResource(R.string.fix_location_action)) {
                     runCatching { context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
@@ -327,10 +331,10 @@ fun MapScreen(session: GroupSession) {
                                 )
                             } else {
                                 Text(from, style = MaterialTheme.typography.labelMedium)
-                                Text(PingText.describe(context, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
+                                Text(PingText.describe(res, b.code, b.arg, poiName), style = MaterialTheme.typography.titleMedium)
                                 if (b.code == Codebook.MEET_AT) {
                                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                        Button(onClick = { vm.accept(b); banner = null; uiScope.launch { snackbar.showSnackbar(context.getString(R.string.codebook_sent, from, context.getString(R.string.code_on_my_way))) } }) { Text(stringResource(R.string.meet_accept)) }
+                                        Button(onClick = { vm.accept(b); banner = null; uiScope.launch { snackbar.showSnackbar(res.getString(R.string.codebook_sent, from, res.getString(R.string.code_on_my_way))) } }) { Text(stringResource(R.string.meet_accept)) }
                                         TextButton(onClick = { banner = null; sheetFor = Recipient(b.senderId, from) }) { Text(stringResource(R.string.meet_counter)) }
                                     }
                                 } else {

@@ -36,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun StatsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val res = LocalResources.current
     val app = context.applicationContext as FireflyApp
     val c = app.container
     val radio by c.radioStatus.status.collectAsStateWithLifecycle()
@@ -111,13 +113,13 @@ fun StatsScreen(onBack: () -> Unit) {
                                 val summary = "scan=${st.scanOnMs.first()}/${st.scanOffMs.first()}ms adv=${st.advInterval.first()}"
                                 val uri = c.fieldLog.export(session?.code, session?.let { SenderId.hex(it.senderId) } ?: "----", BuildConfig.VERSION_NAME, summary)
                                 val send = Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                context.startActivity(Intent.createChooser(send, context.getString(R.string.stats_export)))
+                                context.startActivity(Intent.createChooser(send, res.getString(R.string.stats_export)))
                             }.onFailure { message = it.message ?: "export failed" }
                             busy = false
                         }
                     },
                 ) { Text(stringResource(R.string.stats_export)) }
-                OutlinedButton(enabled = !busy && logCount > 0, onClick = { scope.launch { c.fieldLog.clear(); message = context.getString(R.string.stats_cleared) } }) {
+                OutlinedButton(enabled = !busy && logCount > 0, onClick = { scope.launch { c.fieldLog.clear(); message = res.getString(R.string.stats_cleared) } }) {
                     Text(stringResource(R.string.stats_clear))
                 }
             }
