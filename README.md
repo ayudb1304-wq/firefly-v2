@@ -34,6 +34,7 @@ Requires two physical Android phones (API 26+) with Bluetooth and GPS for anythi
 | `docs/ROADMAP.md` | Phased build plan |
 | `docs/TESTING.md` | Field test plan |
 | `docs/DECISIONS.md` | Decision log |
+| `docs/FIELD_LOG.md` | Results of every real-device test |
 | `docs/KICKOFF_PROMPT.md` | First prompt to paste into Claude Code |
 
 ## Contributing
