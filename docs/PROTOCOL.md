@@ -40,7 +40,7 @@ This is the contract between all Firefly nodes (Android, later iOS and ESP32 tot
 
 ## 4. Sending rules
 - BEACON interval: 3 s moving, 10 s stationary, 30 s if accuracy bucket ≥ 4. Add ±20% random jitter.
-- PING: send 3 times, 1 s apart, same `seq`. Receivers dedupe.
+- PING: send 3 times, 1.5 s apart, same `seq`. Receivers dedupe. The repeats must span longer than any receiver's scan-off gap (§6) so a message can never fall entirely into a gap.
 - SOS (priority flag): TTL = 15, send 5 times over 10 s, repeat every 60 s until cancelled.
 - Default TTL: 6. NAME: 4. ACK: 6.
 - `seq` increments per packet *origination*, not per retransmission.
@@ -63,7 +63,7 @@ Every node runs this on each received advert:
 8. Rate limit relays: max 10 relayed packets per 5 s per node; drop lowest-priority extras.
 
 ## 6. Scanning
-- Foreground service. Scan mode `SCAN_MODE_LOW_LATENCY` in 4 s windows, 2 s off (duty cycle 66%). Field-test builds expose this as a setting.
+- Foreground service. Scan mode `SCAN_MODE_LOW_LATENCY` in 8 s windows, 2 s off (duty cycle 80%; 3 scan starts per 30 s, under Android's 5-per-30 s throttle). The off gap must stay shorter than a PING's repeat span (§4). Field-test builds expose this as a setting.
 - Filter by manufacturer ID `0xFFFF` at the OS level to reduce wake-ups.
 - Record RSSI for every packet for field logs and (v2) proximity estimation.
 

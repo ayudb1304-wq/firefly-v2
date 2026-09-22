@@ -18,7 +18,8 @@ class CodebookTest {
     @Test
     fun `schedules follow the protocol`() {
         assertEquals(3, Codebook.repeats(Codebook.WHERE_ARE_YOU))
-        assertEquals(1_000L, Codebook.spacingMillis(Codebook.WHERE_ARE_YOU))
+        assertEquals(1_500L, Codebook.spacingMillis(Codebook.WHERE_ARE_YOU))
+        assertTrue((Codebook.repeats(Codebook.WHERE_ARE_YOU) - 1) * Codebook.spacingMillis(Codebook.WHERE_ARE_YOU) > 2_000L, "a ping must outlast the 2 s scan-off gap")
         assertEquals(5, Codebook.repeats(Codebook.HELP))
         assertEquals(10_000L, (Codebook.repeats(Codebook.HELP) - 1) * Codebook.spacingMillis(Codebook.HELP), "5 sends over 10 s")
         assertEquals(15, Codebook.ttl(Codebook.HELP))

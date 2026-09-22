@@ -65,14 +65,19 @@ object Codebook {
 
     val userSendable: List<Entry> get() = entries.filter { it.userSendable }
 
-    /** Send schedule (PROTOCOL.md §4): PING ×3 at 1 s; SOS ×5 over 10 s; ACK ×2 (DECISIONS.md). */
+    /**
+     * Send schedule (PROTOCOL.md §4): PING ×3 at 1.5 s (span 3.6 s, longer than any
+     * scan-off gap); SOS ×5 over 10 s; ACK ×2 (DECISIONS.md).
+     */
     fun repeats(code: Int): Int = when {
         code == ACK -> 2
         entry(code)?.priority == true -> 5
         else -> 3
     }
 
-    fun spacingMillis(code: Int): Long = if (entry(code)?.priority == true) 2_500L else 1_000L
+    fun spacingMillis(code: Int): Long = if (entry(code)?.priority == true) 2_500L else PING_SPACING_MS
+
+    const val PING_SPACING_MS = 1_500L
 
     fun ttl(code: Int): Int = if (entry(code)?.priority == true) Protocol.Ttl.SOS else Protocol.Ttl.DEFAULT
 

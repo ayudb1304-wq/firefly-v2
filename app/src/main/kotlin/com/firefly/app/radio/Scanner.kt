@@ -21,8 +21,9 @@ class RawAdvert(val bytes: ByteArray, val rssi: Int, val timestampMillis: Long)
  * Duty-cycled BLE scanner filtered on our manufacturer ID (PROTOCOL.md §6).
  *
  * Android silently throttles an app that starts more than 5 scans in 30 s, so
- * the on/off period must stay ≥ 6 s. Defaults are 8 s on / 4 s off (same 66 %
- * duty as the spec's 4/2 with twice the margin) — see DECISIONS.md.
+ * the on/off period must stay ≥ 6 s. Defaults are 8 s on / 2 s off (80 % duty,
+ * 3 starts per 30 s). The off gap must be shorter than a ping's repeat span
+ * (3 × 1.5 s) so no message can fall entirely into a gap — see DECISIONS.md.
  */
 @SuppressLint("MissingPermission")
 class Scanner(
@@ -105,6 +106,6 @@ class Scanner(
     companion object {
         private const val TAG = "Firefly/Scan"
         const val DEFAULT_ON_MS = 8_000L
-        const val DEFAULT_OFF_MS = 4_000L
+        const val DEFAULT_OFF_MS = 2_000L
     }
 }
