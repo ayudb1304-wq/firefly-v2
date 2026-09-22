@@ -61,12 +61,42 @@ class MapProjection(
         return LatLon(lat + lat0, lon + lon0)
     }
 
+    /** True if the point falls inside the image bounds. */
+    fun contains(lat: Double, lon: Double): Boolean {
+        val p = toPixel(lat, lon)
+        return p.x >= 0 && p.y >= 0 && p.x <= imageWidth && p.y <= imageHeight
+    }
+
+    /** Geographic centre of the image. */
+    fun centre(): LatLon = toGeo(imageWidth / 2.0, imageHeight / 2.0)
+
     /** Approximate image pixels per metre at the map centre (for accuracy rings). */
     fun pixelsPerMetre(): Double {
         val centre = toGeo(imageWidth / 2.0, imageHeight / 2.0)
         val east = toGeo(imageWidth / 2.0 + 100.0, imageHeight / 2.0)
         val metres = GeoMath.distanceMetres(centre.lat, centre.lon, east.lat, east.lon)
         return if (metres > 0) 100.0 / metres else 0.0
+    }
+
+    companion object {
+        private const val METRES_PER_DEGREE_LAT = 111_195.0
+
+        /**
+         * Synthetic north-up calibration: [widthMetres] across, centred on a point,
+         * height scaled to the image aspect. Used for walk tests away from the real venue.
+         */
+        fun centredOn(lat: Double, lon: Double, widthMetres: Double, imageWidth: Int, imageHeight: Int): MapProjection {
+            require(widthMetres > 0)
+            val halfLon = (widthMetres / 2) / (METRES_PER_DEGREE_LAT * kotlin.math.cos(Math.toRadians(lat)))
+            val halfLat = (widthMetres / 2) * imageHeight / imageWidth / METRES_PER_DEGREE_LAT
+            return MapProjection(
+                imageWidth, imageHeight,
+                topLeft = LatLon(lat + halfLat, lon - halfLon),
+                topRight = LatLon(lat + halfLat, lon + halfLon),
+                bottomLeft = LatLon(lat - halfLat, lon - halfLon),
+                bottomRight = LatLon(lat - halfLat, lon + halfLon),
+            )
+        }
     }
 
     /** Least squares for p = k0*lon + k1*lat + k2 over the four corners (normal equations, 3×3). */

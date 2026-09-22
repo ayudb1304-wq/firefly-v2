@@ -57,4 +57,31 @@ class MapProjectionTest {
         assertEquals(g.lat, back.lat, 1e-9)
         assertEquals(g.lon, back.lon, 1e-9)
     }
+
+    @Test
+    fun `contains and centre`() {
+        assertTrue(proj.contains(18.9950, 72.8250))
+        assertTrue(proj.contains(19.0000, 72.8200))
+        assertTrue(!proj.contains(19.0001, 72.8250))
+        assertTrue(!proj.contains(18.9950, 72.8301))
+        val c = proj.centre()
+        assertEquals(18.9950, c.lat, 1e-9)
+        assertEquals(72.8250, c.lon, 1e-9)
+    }
+
+    @Test
+    fun `centredOn builds a map of the requested width around a point`() {
+        val p = MapProjection.centredOn(28.6139, 77.2090, 400.0, 1200, 1200)
+        val c = p.centre()
+        assertEquals(28.6139, c.lat, 1e-9)
+        assertEquals(77.2090, c.lon, 1e-9)
+        val left = p.toGeo(0.0, 600.0)
+        val right = p.toGeo(1200.0, 600.0)
+        assertEquals(400.0, GeoMath.distanceMetres(left.lat, left.lon, right.lat, right.lon), 1.0)
+        val top = p.toGeo(600.0, 0.0)
+        val bottom = p.toGeo(600.0, 1200.0)
+        assertEquals(400.0, GeoMath.distanceMetres(top.lat, top.lon, bottom.lat, bottom.lon), 1.0)
+        assertEquals(3.0, p.pixelsPerMetre(), 0.05)
+        assertTrue(p.contains(28.6139, 77.2090))
+    }
 }

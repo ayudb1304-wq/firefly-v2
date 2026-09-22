@@ -44,6 +44,7 @@ fun MapScreen(session: GroupSession) {
     val members by vm.members.collectAsStateWithLifecycle()
     val me by vm.myFix.collectAsStateWithLifecycle()
     val radio by vm.radio.collectAsStateWithLifecycle()
+    val frame by vm.frame.collectAsStateWithLifecycle()
     val now by produceState(System.currentTimeMillis()) {
         while (true) { delay(1_000); value = System.currentTimeMillis() }
     }
@@ -67,8 +68,17 @@ fun MapScreen(session: GroupSession) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            if (frame.testMap) {
+                Text(
+                    stringResource(R.string.map_test_frame, Format.distance(frame.venueDistanceMetres)),
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
             VenueMap(
                 venue = vm.venue,
+                projection = frame.projection,
                 me = me,
                 members = members,
                 nowMillis = now,

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.firefly.app.core.geo.MapProjection
 import com.firefly.app.core.group.SenderId
 import com.firefly.app.core.protocol.AccuracyBucket
 import com.firefly.app.data.db.MemberEntity
@@ -33,6 +34,7 @@ private const val STALE_AFTER_MS = 60_000L
 @Composable
 fun VenueMap(
     venue: VenuePack,
+    projection: MapProjection,
     me: Fix?,
     members: List<MemberEntity>,
     nowMillis: Long,
@@ -56,14 +58,15 @@ fun VenueMap(
             dstOffset = IntOffset(origin.x.roundToInt(), origin.y.roundToInt()),
             dstSize = IntSize(drawnW.roundToInt(), drawnH.roundToInt()),
         )
-        val pxPerMetre = (venue.projection.pixelsPerMetre() * scale).toFloat()
+        val pxPerMetre = (projection.pixelsPerMetre() * scale).toFloat()
         fun at(lat: Double, lon: Double): Offset {
-            val p = venue.projection.toPixel(lat, lon)
+            val p = projection.toPixel(lat, lon)
             return Offset(origin.x + (p.x * scale).toFloat(), origin.y + (p.y * scale).toFloat())
         }
 
         // POIs
         venue.pois.forEach { poi ->
+            if (!projection.contains(poi.lat, poi.lon)) return@forEach
             val o = at(poi.lat, poi.lon)
             drawCircle(onMap.copy(alpha = 0.6f), radius = 3.dp.toPx(), center = o)
             drawText(measurer, poi.name, topLeft = o + Offset(5.dp.toPx(), -7.dp.toPx()), style = poiStyle)
@@ -73,6 +76,7 @@ fun VenueMap(
         members.forEach { m ->
             val lat = m.lat ?: return@forEach
             val lon = m.lon ?: return@forEach
+            if (!projection.contains(lat, lon)) return@forEach
             val o = at(lat, lon)
             val stale = nowMillis - m.lastSeen > STALE_AFTER_MS
             val alpha = if (stale) 0.45f else 1f

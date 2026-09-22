@@ -28,6 +28,7 @@
     <string name="map_group">Group %1$s</string>
     <string name="map_subtitle">You are %1$s · %2$d heard</string>
     <string name="map_leave">Leave</string>
+    <string name="map_test_frame">Test map, 400 m wide, centred on you · venue is %1$s away</string>
     <string name="map_no_members">No one heard yet. Friends who join with the same code appear here.</string>
 
     <!-- Service notification -->
